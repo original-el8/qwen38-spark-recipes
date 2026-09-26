@@ -38,7 +38,8 @@ vllm serve /model \
 | `--enable-prefix-caching --enable-chunked-prefill --async-scheduling` | production serving defaults validated with the recurrent-checkpoint "aligned" policy |
 | `--tool-call-parser qwen3_xml --reasoning-parser qwen3 --enable-auto-tool-choice --generation-config vllm` | the model's native XML tool-call format and thinking channel |
 | `--mm-encoder-tp-mode data --mm-processor-cache-gb 0 --limit-mm-per-prompt '{"image":1}'` | vision tower replicated per rank, no processor cache; keep multimodal from stealing KV memory |
-| `--compilation-config` | `fuse_act_quant` pass + FULL_AND_PIECEWISE CUDA graphs; capture sizes cover every MTP verify/draft batch shape up to 80 (= 16 seqs × (3+1) + margin) |
+| `--gdn-decode-kernel b12x --linear-backend b12x --moe-backend b12x` | b12x kernels for GDN state updates, projections, and routed experts (matches eugr's official recipe; `B12X_POLICY_MODE=auto` resolves the per-layer plans) |
+| `--no-enable-flashinfer-autotune` | autotune adds nondeterministic per-boot latency sweeps on Spark; the b12x/plan kernels are selected instead (also in karmic's launcher and eugr's recipe) |
 
 ## Environment (compose.yml)
 
@@ -65,6 +66,8 @@ vllm serve /model \
 |---|---|---|
 | `VLLM_QWEN3_8_FLASH_NEXT_HC_TP` | `1` | TP-shards the HyperConnection workspace (stock-karmic equivalent of the campaign `VLLM_QWEN3_8_HC_PREFILL_MODE=shard` + coalescing). Requires `hc_lowrank % tp_size == 0`; **TP4-only** |
 | `VLLM_USE_V2_MODEL_RUNNER` | `1` | v2 worker path the fleet runs qualified on the campaign stack |
+| `B12X_POLICY_MODE` | `auto` | eugr-official: b12x chooses per-layer kernel plans from the checkpoint's quant config |
+| `VLLM_USE_AOT_COMPILE` / `VLLM_USE_MEGA_AOT_ARTIFACT` | `1` / `1` | use the precompiled AOT artifact shipped in the eugr nightly (vendor recipe for this model); if startup ever fails inside AOT load, set both `0` as the documented fallback |
 | `VLLM_SSM_CONV_STATE_LAYOUT` | `DS` | conv-state layout the b12x GDN kernel expects |
 | `VLLM_PLE_CPU_OFFLOAD` | `0` | PLE/Engram table stays resident (disk/Grace tier is a GB300 trick, not needed on 4×GB10) |
 | `TORCH_CUDA_ARCH_LIST`/`FLASHINFER_CUDA_ARCH_LIST` | `12.1a` | GB10 arch propagation |

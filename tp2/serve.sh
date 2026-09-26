@@ -66,6 +66,9 @@ exec vllm serve /model \
   --dtype bfloat16 \
   --quantization modelopt_mixed \
   --gdn-decode-kernel b12x \
+  --linear-backend b12x \
+  --moe-backend b12x \
+  --no-enable-flashinfer-autotune \
   --mm-encoder-tp-mode data \
   --mm-processor-cache-gb 0 \
   --limit-mm-per-prompt '{"image":1}' \

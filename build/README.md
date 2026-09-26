@@ -12,16 +12,20 @@ comparison between them is in the top-level README.
 
 - `eugr/spark-vllm-b12x:latest` / `eugr/spark-vllm-b12x:nightly-YYYYMMDD`, `linux/arm64` only.
 - Nightly source pair: vLLM [`local-inference-lab/vllm@dev/karmic-kraken`](https://github.com/local-inference-lab/vllm/tree/dev/karmic-kraken)
-  + [`local-inference-lab/b12x@master`](https://github.com/local-inference-lab/b12x) (PyTorch 2.13.0, CUTLASS DSL 4.7.0 pinned by the build repo).
+  + [`local-inference-lab/b12x@master`](https://github.com/local-inference-lab/b12x)
+  (PyTorch 2.13.0, CUTLASS DSL 4.7.0 pinned by the build repo).
 - The b12x source commit of a given nightly is recorded **inside the image** at
   `/workspace/b12x-source-commit` (tags carry no source identity), so always record both the
   tag and the digest after `docker pull`.
-- `dev/karmic-kraken` is the successor lineage of `dev/jovian-judgement` (absorbed by PR #784,
-  2026-09-14) and carries the Qwen3.8 Flash Next model (renamed `vllm/models/qwen4_exp/`),
-  RoCE (RoCEnante) cross-node collectives, HC TP-sharding (`VLLM_QWEN3_8_FLASH_NEXT_HC_TP`),
-  MTP, PLE, QSA, and the b12x linear/MoE/GDN wiring. b12x `master` includes every merged
-  performance PR referenced below (QSA stable selection #394, NVFP4 FC1 padding #389, E4M3
-  subnormals #388, RoCEnante #295/#315/#383).
+- Verified state of the ecosystem branches (checked 2026-09-25 via authenticated API):
+  `dev/karmic-kraken` contains `vllm/models/qwen3_8_flash_next/` **and** `qwen4_exp/`, registers
+  `Qwen3_8FlashNextForConditionalGeneration` in the model registry, carries the RoCE adapter
+  from jovian PR #597 (`b12x_roce_all_reduce.py` + `VLLM_ENABLE_ROCE_ALLREDUCE` /
+  `_ALLREDUCE_MAX_SIZE` / `_ALLGATHER_MAX_SIZE`), and exposes the HC knobs under their current
+  names (`VLLM_QWEN3_8_FLASH_NEXT_HC_TP` default on, `_OVERLAP`, `_MTP_COMPACT`). jovian PR
+  **#784 was closed unmerged**, yet the absorbed content exists in karmic through later
+  landings; the remaining gap is the fleet's post-merge local work (campaign `76061de4`),
+  which was never pushed to the repo at all — that is exactly what Path B carries.
 
 Pin used by these recipes:
 
@@ -32,6 +36,25 @@ eugr/spark-vllm-b12x:nightly-20260925   hub manifest digest sha256:c9e22735a5bb7
 After pulling on every host, require the same **image ID** everywhere
 (`docker image inspect -f '{{.Id}}'`); a tag match is not proof. Record
 `docker run --rm --entrypoint cat <image> /workspace/b12x-source-commit`.
+
+### Vendor recipes for this exact model
+
+`eugr/spark-vllm-docker` ships [`recipes/qwen3.8-flash-next-nvfp4-cluster.yaml`](https://github.com/eugr/spark-vllm-docker/blob/main/recipes/qwen3.8-flash-next-nvfp4-cluster.yaml)
+(2-node) and `…-solo.yaml` (1 Spark + PLE disk offload). These recipes follow it closely
+(`--mamba-cache-mode align`, `--kv-cache-dtype fp8`, `--quantization modelopt_mixed`,
+`--gdn-decode-kernel/--linear-backend/--moe-backend b12x`, `B12X_POLICY_MODE=auto`,
+`--no-enable-flashinfer-autotune`, AOT env pair, `qwen3_xml`/`qwen3` parsers,
+`fuse_act_quant`). Deliberate deviations, each measured on this fleet (campaign evidence under
+`../tp4/`):
+
+| vendor default | this recipe | why |
+|---|---|---|
+| `--load-format b12x` | `instanttensor` | operator preference; both supported by the image |
+| MTP4 @ 4,096 batched tokens | MTP3 @ 8,192 | depth sweep `qwen38-qsa-mtp-20260916` picked 3; 8,192 removes the MTP batch-size warning and measured better coalesced prefill |
+| `gpu_memory_utilization 0.7` (cluster) | `0.80` + explicit `--kv-cache-memory-bytes` | KV budget is the memory-safety control here; measured floor ≥16 GiB MemAvailable |
+| no context override | `config.json` override `index_share_for_mtp_iteration=false` | qualified MTP correctness fix |
+| vendor `launch-cluster.sh` tooling | host-network container + explicit fabric env block | four-node topology with dual-HCA cabling needs the exact `NCCL_IB_*`/`MERGE_NICS` settings below |
+| no `--async-scheduling` | enabled | campaign-validated serving default |
 
 ## Path B — fleet overlay images (campaign-built, historical measurements)
 
@@ -74,10 +97,9 @@ The Dockerfile and builder used are in this directory verbatim:
    label, and in-image-manifest verification on every host. (~24.4 GiB → ~10.6 GiB compressed,
    ≈200 s to three peers over 10 GbE.)
 
-Why overlays exist: the campaign's vLLM branch (`76061de4`, HC token-ownership prefill, PLE
-checkpoint export, MoE shard alignment — 10 commits on `dev/jovian-judgement@59fbf050`) was
-measured before that work reached `dev/karmic-kraken`, and the fleet images must not recompile
-kernels per host.
+Why overlays existed: the campaign's vLLM branch (`76061de4`, HC token-ownership prefill, PLE
+checkpoint export, MoE shard alignment — 10 local commits) post-dates everything public at the
+time and was never pushed; the fleet images must also not recompile kernels per host.
 
 ## Open questions tracked by the fleet (not blockers)
 
