@@ -40,15 +40,17 @@ sleep 3
 ssh maxwell "cd $Q2 && docker compose --env-file maxwell.env -p $T2 up -d" || { echo "FAIL tp2 coordinator"; restore_tp4; exit 1; }
 
 echo "== wait TP2 readiness"
+C0=$(ssh maxwell "cd $Q2 && docker compose -p $T2 ps --format '{{.Name}}' | head -1")
+echo "tp2 coordinator container: $C0"
 READY=0
 for i in $(seq 1 110); do
   # live API readiness (stale logs from prior runs of the same container never lie)
   code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://maxwell:8000/v1/models || echo 000)
   [ "$code" = 200 ] && { READY=1; break; }
-  ssh maxwell "docker inspect -f '{{.State.Running}}' $T2-0" 2>/dev/null | grep -q true || { echo "FAIL: tp2 rank0 exited"; ssh maxwell "docker logs --tail 40 $T2-0"; restore_tp4; exit 1; }
+  ssh maxwell "docker inspect -f '{{.State.Running}}' $C0" 2>/dev/null | grep -q true || { echo "FAIL: tp2 rank0 exited"; ssh maxwell "docker logs --tail 40 $C0"; restore_tp4; exit 1; }
   sleep 30
 done
-[ "$READY" = 1 ] || { echo "FAIL: tp2 readiness cap"; ssh maxwell "docker logs --tail 40 $T2-0"; restore_tp4; exit 1; }
+[ "$READY" = 1 ] || { echo "FAIL: tp2 readiness cap"; ssh maxwell "docker logs --tail 40 $C0"; restore_tp4; exit 1; }
 echo TP2-READY
 
 echo "== smoke + quick probe (cells prefixed tp2-stock-karmic-nightly)"
