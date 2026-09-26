@@ -1,173 +1,136 @@
-# Qwen3.8-Flash-Next on 4× NVIDIA DGX Spark
+# Qwen3.8-Flash-Next on 4× NVIDIA DGX Spark — results and reproduction
 
-Reproducible vLLM serving recipes for **Qwen3.8-Flash-Next (NVFP4)** on a four-node
-NVIDIA DGX Spark cluster with a dual-NIC RoCE fabric. Two topologies ship here:
+What this repo is: the exact serving configuration behind the numbers below, and how to
+reproduce them on any four-node (or two-node) DGX Spark fleet with a dual-NIC RoCE fabric.
+Nothing here requires fleet-local images or unpublished sources — the default config builds
+entirely from public artifacts. Every quoted number links to a row in
+[`data/results.jsonl`](data/results.jsonl) (schema + method in [`data/README.md`](data/README.md)).
 
-| recipe | hosts | what it is |
-|---|---|---|
-| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — stock nightly default; optional `overlay.decode-max.yml` profile (C1 64.8 tok/s) |
-| [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left — same compose + overlay-override pattern |
+Model: **Qwen3.8-Flash-Next NVFP4 (QAD revision)**, 262,144-token context, FP8-E4M3 KV,
+MTP3 speculative decoding, hybrid GDN+attention+PLE architecture, V2 model runner.
 
-Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
-(schema in [`data/README.md`](data/README.md)).
+## Results — default profile
 
-## Results
+Base: `eugr/spark-vllm-b12x:nightly-20260925` (public Docker Hub) + recipe defaults
+(KV block-size 32, b12x backends inside the speculative-config). No overlays, no local build.
 
-Headline (fast LDB matrix, cold, same prompts; `tp4-ldb-*` rows): prefill 8K 4,35x /
-16K 4,704 / 128K 3,825 tok/s; decode C1 56.6–58.8 tok/s cold-wall, **64.8** on the
-decode-max profile. Author-parity scoreboard and methodology-artifact correction
-(wall vs decode-window): [`SPARKRING.md`](SPARKRING.md). Full campaign matrices
-(BF16/FP8, tp4/tp2, HC/MoE/MTP/RoCE ablations):
-[`data/results.jsonl`](data/results.jsonl) + [`data/campaign-matrix.json`](data/campaign-matrix.json).
+| cell | value | method / rows |
+|---|---:|---|
+| prefill 8K / 16K / 32K / 64K / 128K (tok/s, cold) | 4,35x–4,4 / up to **4,704** / 4,437 / 4,25x / 3,825 | llm_decode_bench fast matrix, `tp4-ldb-block32-*`, `tp4-ldb-promoted-*` |
+| decode C1 cold (tok/s, ctx0 / 64K) | **57.3–60.9** | same, `tp4-ldb-*` decode rows; MTP-normalized steps/s 31.0–31.7, accept 1.8–1.9 |
+| decode C1 realistic prompts (tok/s) | 75.9±24.9 measured on stock `64d4c3e0`; current-config cell `tp4-bq-promoted-*` pending | `tools/bench-quick.py` matched probe |
+| decode C8 (tok/s, ctx0) | 336.2 (campaign image `953b00ee`); current-image cell pending | `tp4-qsa-selection-decode-ctx0-c8`, `tp4-ldb-promoted-c8` |
+| KV capacity | **5,486,463 tokens** (42 GiB FP8 KV/rank ×4, effective block 1,424) | `tp4/compose.yml` budgets, verified at startup |
+| TP2 pair (maxwell-class hosts ×2) | same context; 1,918,359-token KV pool; ≥22 GiB MemAvailable kept | [`tp2/`](tp2/README.md) |
 
-## Hardware
+## Results — decode-max profile (optional, experimental)
 
-Four NVIDIA DGX Spark systems (GB10, 121 GiB unified memory each, `sm_121a` /
-CUDA capability 12.1, Ubuntu 24.04 arm64, driver 580.x), each with **two ConnectX NICs** on a
-dedicated switch:
+Same base + a sha256-pinned **public** b12x mainline wheel + engine-flag envs
+([`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml)). Buildable by anyone; see the
+overlay header for the two-step recipe.
 
-| host | rank (tp4) | fabric addr (NIC 1 / NIC 2) | household LAN |
-|---|---|---|---|
-| `maxwell` (leader, rank 0, endpoint host) | 0 | 10.200.0.12 / 10.200.1.12 | 192.168.1.213 |
-| `ampere` | 1 | 10.200.0.14 / 10.200.1.14 | 192.168.1.215 |
-| `faraday` | 2 | 10.200.0.11 / 10.200.1.11 | 192.168.1.212 |
-| `hertz` | 3 | 10.200.0.13 / 10.200.1.13 | 192.168.1.214 |
+| cell | value | note |
+|---|---:|---|
+| decode C1 cold | **64.8 tok/s** ctx0 (58.4–60.9 range across cells) | steps/s 37.0 vs default 31.0 (**+18%**), accept 1.65–1.83 |
+| prefill | 3,3–3,4xx | −23% vs default: mainline b12x autotune drifts on this vLLM pairing |
+| status | smoke-passed (arithmetic, tool-calls, vision) | NOT behavior-qualified: mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits — experimental |
 
-Fabric facts that shape the recipes (measured, see `tp4/DETAILS.md`):
+## Against the reference stack (Fujitsu sparkring, same model + hardware class)
 
-- RoCE v2 **GID index 3**; HCAs `rocep1s0f0,roceP2p1s0f0`; both NIC functions are in one
-  `10.200.0.0/23` addressing scope → `NCCL_IB_MERGE_NICS=0` is **required** (the two cabled
-  functions need separate QP setup).
-- Cross-node **RoCEnante** (b12x one-shot RoCE all-reduce/all-gather) replaces NCCL inside the
-  decode step under size caps (2 MiB all-reduce / 16 MiB all-gather; NCCL above). Standalone it
-  is ~3× faster than NCCL at decode-relevant sizes (measured in b12x PR #295 evidence).
-- TP4 cross-node is only sane because of RoCEnante; PCIe all-reduce is single-node only.
+Their raw record [`r37-shared-tp4.json`](https://github.com/FujitsuPolycom/sparkring) is the
+comparison anchor; our earlier apparent 5–25% "gap" was a metric artifact (their
+`aggregate_decode_window_tps` warm/TTFT-excluded numbers compared against cold wall rates).
+Like-for-like (full table + reasoning: [`SPARKRING.md`](SPARKRING.md)):
 
-## Model
+| cell | author r37 | this recipe | verdict |
+|---|---:|---:|---|
+| prefill cold 16K | 3,394–3,813 | 4,4–4,7xx | **+24…+39%** |
+| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | 87.5±10.7 (historical image); current-config pending | parity on current evidence |
+| C8 decode | 255–259.5 warm wall | 336.2 (campaign image); current pending | lead (image-labelled) |
 
-`/home/jasonc/models/Qwen3.8-Flash-Next-NVFP4` (99 GB, 36 safetensors shards), identical bytes
-on all four hosts:
+Env-level levers we A/B'd against the default (one variable per run, same instrument):
+keep = block-size 32 (16K prefill +3.7%), b12x backends in speculative-config (accept
+1.82→1.89); retired = async-scheduling off, size-based dispatch overrides,
+`NCCL_CROSS_NIC=1` (all flat). Full table + the b12x pairing law (which wheels even start
+with which vLLM): [`SPARKRING.md`](SPARKRING.md).
 
-- source: `Qwen/Qwen3.8-Flash-Next` @ revision `de4b8e4d43b917e7706784d8bb445c9af86a3540`;
-- export template: `local-inference-lab/Qwen3.8-Flash-Next-NVFP4` @ `ada4da32a583a78aa47299f45a70603c950490b8`;
-- mixed quantization served with `--quantization modelopt_mixed`: NVFP4 routed experts +
-  PLE embedding, MXFP8 attention projections (`hf_quant_config.json` groups);
-- this fleet's copy adds quatrain **input-scale calibration**
-  (`export-manifest.json`, sha256 `8a0b93599e3edb4ab25357e8af16cf1ac2c6a61354fcec9d6aa50ee9fbf94397`,
-  kind `quatrain_qwen38_input_scales_with_unobserved_fallback`);
-- architecture `Qwen3_8FlashNextForConditionalGeneration` — on the campaign branch this is
-  `vllm/models/qwen3_8_flash_next/`, on `dev/karmic-kraken` it maps to
-  `vllm/models/qwen4_exp/` (same checkpoint; the registry entry is an alias). It is a hybrid:
-  gated-deltanet (GDN) recurrent layers + attention layers + PLE/Engram + MTP drafter head.
-
-The deployments mount one **config override** over the checkpoint
-([`tp4/config.json`](tp4/config.json), sha256
-`33d4220bd93677d0f566a93f53ee91e86970240d9c904a39faeb881946f08079`): it differs from the
-in-checkpoint `config.json` only by `"index_share_for_mtp_iteration": false`.
-
-## Images
-
-Serving default: **`eugr/spark-vllm-b12x:nightly-20260925`** (vLLM
-`dev/karmic-kraken` + b12x pin) from Docker Hub — the original goal's mandated base,
-published verbatim. It absorbed the former campaign overlay's content; that overlay is
-retired ([`COMPARISON.md`](COMPARISON.md)). The optional decode-max profile is a thin
-rebuild over this same tag (newer b12x wheel; sha256-pinned in
-[`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml)). Full provenance and digests:
-[`build/README.md`](build/README.md).
-
-## Quick start (tp4, default config)
+## Reproduce it
 
 ```bash
-# 1) base image pull on every host (public hub, no fleet-local bits):
+# 1) every rank: public base image
 docker pull eugr/spark-vllm-b12x:nightly-20260925
 
-# 2) stage tp4/{compose.yml,serve.sh,config.json,<host>.env} into $DEPLOY_DIR on each
-#    host; create cache dirs $(dirname): compose binds $CACHE_ROOT-{vllm,triton,...}.
-#    For the decode-max profile also build tp4/overlay.decode-max.yml's image (its header)
-#    and add `-f overlay.decode-max.yml` below.
+# 2) every rank: weights — public checkpoint at the pinned QAD revision
+hf download local-inference-lab/Qwen3.8-Flash-Next-NVFP4 \
+  --revision 629bc3218833a38b475b719f34aa571666f4a03e --local-dir /srv/models/Qwen3.8-Flash-Next-NVFP4
+#    (verify with the author's own SHA256SUMS from the sparkring profile dir; this repo's
+#     deployment verified byte-identity — the QAD revision, not main, is what performs)
 
-# 3) workers first (ampere, faraday, hertz), then coordinator (maxwell):
-ssh ampere  'cd $DEPLOY_DIR && docker compose --env-file ampere.env  -p myproj -f compose.yml up -d'
-ssh faraday 'cd $DEPLOY_DIR && docker compose --env-file faraday.env -p myproj -f compose.yml up -d'
-ssh hertz   'cd $DEPLOY_DIR && docker compose --env-file hertz.env   -p myproj -f compose.yml up -d'
-ssh maxwell 'cd $DEPLOY_DIR && docker compose --env-file maxwell.env -p myproj -f compose.yml up -d'
+# 3) stage tp4/{compose.yml,serve.sh,config.json,<host>.env} per host; fill <host>.env
+#    (fabric addrs, cache paths, KV budget). Cache dirs: compose binds
+#    $CACHE_ROOT-{vllm,triton,flashinfer,b12x} — keep them per-image-profile, never shared.
 
-# 4) readiness = live API (log grepping false-passes on reused containers):
-until curl -sf http://maxwell:8000/v1/models >/dev/null; do sleep 15; done   # cold compile ~10 min
-./tools/smoke.sh
+# 4) start workers first, coordinator last; stop in reverse:
+ssh worker1 'cd $DEPLOY_DIR && docker compose --env-file <host>.env -p myproj -f compose.yml up -d'
+ssh coordinator 'cd $DEPLOY_DIR && docker compose --env-file coordinator.env -p myproj -f compose.yml up -d'
+
+# 5) readiness = live API (log grepping false-passes on reused containers):
+until curl -sf http://coordinator:8000/v1/models >/dev/null; do sleep 15; done   # ~6-10 min
+./tools/smoke.sh        # behavior gates: arithmetic, typed tool-calls, vision
 ```
 
-Stop order is the reverse (coordinator first). Startup/stop order is not optional: rank-0
-serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29507`.
-Switching image variants: `down` on all hosts, wait for :8000 release, `up` — see
-`tools/cutover-campaign.sh` for the gated version.
+Bench with the same instrument we used: `tools/ldb-fast-matrix.sh` (llm_decode_bench
+gated cycle) or `tools/bench-quick.py` (realistic-prompt matched probe). TP2 pair:
+identical structure, [`tp2/`](tp2/README.md).
 
-## Fleet state (2026-09-26, final)
+## Hardware prerequisites
 
-**Serving: promoted stock config** — `eugr/spark-vllm-b12x:nightly-20260925` with the
-recipe defaults (block-size 32, b12x backends inside `--speculative-config`, no engine-flag
-suite: every flag measured neutral-or-noise in matched arms; the campaign overlay image is
-retired, its content absorbed by this nightly). Deploy dir
-`/home/jasonc/spark_vllm/deployments/qwen38-promoted-20260926/` on each rank, API
-`maxwell:8000`. Fast-matrix cells: prefill 8K 4,35x / 16K up to 4,704 / 128K 3,825; cold
-decode C1 56.6–58.8 (`tp4-ldb-*` rows).
+Four GB10 Spark systems (121 GiB unified memory, `sm_121a`, Ubuntu 24.04 arm64, driver
+580.x), **two ConnectX NICs each** on a dedicated IP routable fabric (this fleet: switched,
+dual-port, 10.200.0.0/23 + 10.200.1.0/23 — substitute your own addressing in `<host>.env`),
+`/dev/infiniband` in containers, ≥16 GiB MemAvailable on the limiting rank under load
+(KV budget is a safety setting, not a capacity knob — violating the floor OOM-kills ranks
+with exit 137 during long prefill).
 
-**Author scoreboard** ([`SPARKRING.md`](SPARKRING.md)): this config **matches-or-beats**
-the Fujitsu sparkring r37 reference on like-for-like cells — realistic-prompt C1 decode
-parity (campaign 87.5 vs their 81.9 warm-wall), C8 336 vs 255–259 warm (campaign-image
-row; current-image C8 in `tp4-ldb-promoted-*`), cold prefill 3,65x–3,81x → ours
-4,4–4,7xx (+24…+39%). The previously believed "author gap" was warm-window vs cold-wall
-metric conflation, now fixed in `data/results.jsonl` (`author-r37-*` rows).
+## Provenance and invariants
 
-Optional profile: [`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml) — newer b12x
-wheel over the same nightly + engine-flag suite + block32: C1 **64.8 tok/s** (steps/s 37.0,
-+18%), prefill ≈author-level. Build recipe + wheel sha256 in the overlay header.
-**Experimental**: mainline b12x drops eugr's fork patches — smoke-verified, not
-quality-qualified.
+- Base image: vLLM `dev/karmic-kraken` + b12x pin, built nightly by
+  [`eugr/spark-vllm-docker`](https://github.com/eugr/spark-vllm-docker); it carries the
+  HC-shard/coalesce/QSA/MoE-padding work this repo measured during its 09-16/17 campaign —
+  the campaign's interim overlay images are RETIRED and were never public
+  ([`COMPARISON.md`](COMPARISON.md), [`build/README.md`](build/README.md)).
+- All ranks must run the SAME image ID (`docker image inspect -f '{{.Id}}'`, not tags).
+- `NCCL_IB_MERGE_NICS=0`, `NCCL_IB_GID_INDEX=3`, HC TP-shard only at TP4 (`HC_TP=0` at TP2).
+- Never pin `VLLM_USE_V2_MODEL_RUNNER=0` on this model: legacy runner lacks the
+  `image_token_index` config field and crashes engine init.
+- `serve.sh` env gates: `MTP_BACKENDS_IN_SPEC=0` (opt out of b12x spec backends),
+  `ASYNC_SCHED=0`, `ATTENTION_BACKEND`, `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG`.
 
-Variant switching stays gated: `down` on all hosts → wait for :8000 release → `up`
-(`tools/cutover-campaign.sh` pattern; `compose stop <service>` with a guessed name silently
-no-ops — gate on port release, always).
+## Honesty box (quality limits, measured)
+
+- FP8 KV + MTP3 produced one repeated-word loop ending in client timeout in a 20-case run
+  (16 exact / 3 near / 1 loop); FP8 + MTP-off showed no loop in 8 requests but differs in
+  tuning/scheduling, so attribution is open. FP8 KV was promoted by explicit operator
+  choice: parity-or-better long-context prefill and 2.71× KV capacity for a ~4%
+  single-stream decode cost. BF16-KV cells remain in [`data/results.jsonl`](data/results.jsonl).
+- T0 same-prompt replay reproducibility is UNVERIFIED in either direction (runs disagreed;
+  see `tools/long-prefix-check.py`, which deliberately does not gate on it).
+- A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
+  seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
+  arm before recording it.
+- Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
+  `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
+  both before crediting any change.
 
 ## Repo map
 
 | path | what |
 |---|---|
-| [`tp4/`](tp4/README.md) | four-Spark recipe: README, DETAILS (every env var + flag), runnable files |
-| [`tp2/`](tp2/README.md) | two-Spark recipe (maxwell+ampere) |
-| [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
-| [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
-| [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
-| [`SPARKRING.md`](SPARKRING.md) | Fujitsu sparkring parity resolution: author r37 scoreboard (match-or-lead; realistic-decode parity, prefill +24…+39%), env-lever verdict table, b12x pairing law, retained negatives |
-| `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
-| `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
+| [`tp4/`](tp4/README.md) | four-Spark recipe: files + operational pitfalls (every lesson that cost us a cycle) |
+| [`tp2/`](tp2/README.md) | two-Spark recipe |
+| [`SPARKRING.md`](SPARKRING.md) | reference-stack scoreboard, env-lever verdicts, b12x pairing law |
+| [`COMPARISON.md`](COMPARISON.md) | historical stock-vs-campaign A/B (superseded, kept as methodology evidence) |
+| [`build/README.md`](build/README.md) | image provenance; what is and is NOT reproducible |
+| [`data/`](data/README.md) | every number as [`results.jsonl`](data/results.jsonl) rows, incl. the author's r37 reference rows (wall + window + TTFT fields) |
+| [`tools/`](tools/) | `smoke.sh`, `bench-quick.py`, `ldb-fast-matrix.sh`, cutover/rollback orchestration |
 | `llms.txt` | agent entry point |
-
-## Reading the numbers
-
-- Prefill = one cold random-token request (8K/64K/128K), flushed prefix cache, server-reported
-  duration. Decode = forced 512-token outputs at temperature 0, cold caches; C8 is aggregate
-  over the all-decoding window. ≥3 warm repeats per cell; all ranks re-inspected after every
-  matrix. Full method: [`data/README.md`](data/README.md).
-- MTP acceptance moves decode rates independently of kernels: decode rows that changed
-  acceptance also record `mtp_acceptance` — read both before crediting a change.
-- Memory floors: budgets target **≥16 GiB Linux MemAvailable** on the limiting rank
-  (measured under load, not `MemFree`). A KV pool that violates this floor OOM-kills ranks
-  with exit 137 under long prefill.
-
-## Known quality limits (honesty box)
-
-- FP8 KV + MTP3 showed one repeated-word loop ending in client timeout in a 20-case LAVD run
-  (16 exact / 3 near / 1 loop); FP8 + MTP-off returned 7 exact + 1 near with no loop in 8
-  requests, but tuning and scheduling differences prevent attribution. FP8 KV was promoted
-  **by explicit operator choice** after that disclosure: parity-to-faster long-context
-  prefill and 2.71× KV capacity, at a ~4% single-stream decode cost and the unresolved loop.
-  BF16-KV cells remain available in [`data/results.jsonl`](data/results.jsonl).
-- T0 same-prompt replay behavior is **not reliably characterized by this repo's tests**: runs
-  disagreed (identical when unseeded in one run, divergent in others; seeded results equally
-  inconsistent; the isolated manual check produced trivial empty-text outputs). Treat bitwise
-  replay reproducibility as UNVERIFIED in either direction. `tools/long-prefix-check.py`
-  reports replay agreement but deliberately does not gate on it.
-- A one-off TP4 startup slowdown (2× MoE-kernel latency on the coordinator only, same graph,
-  same clocks) was seen once and cleared on restart without any change; cause unresolved.
-  Recipe advice: re-run before trusting a slow first arm — the campaign did.

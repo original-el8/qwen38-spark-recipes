@@ -1,75 +1,81 @@
 # TP4 recipe — Qwen3.8-Flash-Next on four DGX Sparks
 
-Serves `Qwen3.8-Flash-Next` (and alias `qwen38-flash-next-nvfp4`) at
-`http://maxwell:8000/v1` with 262,144-token context, 16 concurrent sequences, and an
-FP8-E4M3 KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424
-tokens).
+Serves `Qwen3.8-Flash-Next` (alias `qwen38-flash-next-nvfp4`) at
+`http://<coordinator>:8000/v1`: 262,144-token context, 16 concurrent sequences, FP8-E4M3
+KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424).
+Example fleet: coordinator `maxwell` + workers `ampere`, `faraday`, `hertz` — substitute
+your own hosts; only rank order matters.
 
-## Default and optional profile
+## What you get (default profile)
 
-`compose.yml` alone is the serving default: stock
-`eugr/spark-vllm-b12x:nightly-20260925` + recipe defaults (block-size 32; b12x backends
-inside `--speculative-config` via `serve.sh`). The former campaign overlay is RETIRED —
-this nightly absorbed its content ([`../COMPARISON.md`](../COMPARISON.md) supersession
-banner; prefill/decode cells in `../data/results.jsonl` `tp4-ldb-*` / `tp4-stock-karmic-*`).
+Stock `eugr/spark-vllm-b12x:nightly-20260925` + recipe defaults (KV block-size 32; b12x
+backends inside `--speculative-config`, applied by `serve.sh`). No overlay, no local build.
+
+| | default profile | decode-max profile (optional) |
+|---|---|---|
+| prefill cold 8K / 16K / 128K | ~4,4 / **4,704** / 3,825 tok/s | 3,3–3,4xx (−23%) |
+| decode C1 cold | 57.3–60.9 tok/s (steps/s 31.0–31.7) | **64.8 tok/s** ctx0 (steps/s 37.0, +18%) |
+| vs author r37 reference | prefill +24…+39%; realistic-prompt decode parity | prefill ≈author; decode lead |
+| qualification | shipped default | EXPERIMENTAL (mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits) |
+
+Row IDs + full matrices: [`../data/results.jsonl`](../data/results.jsonl)
+(`tp4-ldb-*`, `tp4-ldb-block32-*`, `tp4-ldb-promoted-*`); scoreboard:
+[`../SPARKRING.md`](../SPARKRING.md). The retired campaign image's matched numbers
+(4,894 / 4,712 / 4,556 / 4,304 cold prefill ≈ parity with this default; 336.2 C8 decode)
+stay in `results.jsonl` as `tp4-overlay-*` / `tp4-qsa-selection-*` historical rows — see
+[`../COMPARISON.md`](../COMPARISON.md) for what that comparison taught us.
 
 ```bash
-# workers first (ampere, faraday, hertz), coordinator (maxwell) last — on each host:
-cd $DEPLOY_DIR   # staged copy of these files + config.json + serve.sh
+# one service per host; workers first, coordinator last; stop in reverse:
+cd $DEPLOY_DIR   # staged copy of these files on EVERY host (pitfall 8)
 docker compose --env-file <host>.env -p <project> up -d
 docker compose --env-file <host>.env -p <project> down   # name-safe stop
-# optional decode-max profile (build its image first, header of the overlay):
+# optional decode-max profile (build its image first — header of the overlay):
 docker compose --env-file <host>.env -p <project> -f overlay.decode-max.yml up -d
 ```
 
-- **Default** → prefill champion (16K 4,704; 128K 3,825) + cold C1 56.6–58.8; author
-  scoreboard in [`../SPARKRING.md`](../SPARKRING.md) — match-or-lead on every comparable
-  cell (realistic-prompt decode parity; prefill +24…+39%).
-- **Decode-max overlay** → C1 64.8 tok/s (steps/s 37.0); prefill ≈author-level. Same
-  weights, same base tag; the delta is a sha256-pinned b12x wheel + engine-flag envs.
-  EXPERIMENTAL: mainline b12x drops eugr's 17 fork-ahead (GB10/Spark) commits —
-  smoke-passed, not behavior-qualified.
-- `serve.sh` is one env-gated script for all variants (`ATTENTION_BACKEND`,
-  `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ default behavior;
-  `MTP_BACKENDS_IN_SPEC=0` opts out of b12x spec backends; `ASYNC_SCHED=0` off).
+- `overlay.decode-max.yml` = image + env delta over the same base/weights: a
+  sha256-pinned **public** b12x wheel + engine-flag envs; build recipe in its header.
+- `serve.sh` is ONE env-gated script for all variants: `MTP_BACKENDS_IN_SPEC=0` opts out
+  of b12x spec backends; `ASYNC_SCHED=0`, `ATTENTION_BACKEND`,
+  `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ default behavior.
 - Switching variants on a live fleet: full `down` + port-release wait + `up` — NEVER a
-  targeted `stop <service>` (name-safe lesson, 2026-09-26 EADDRINUSE false-regression;
-  gated promotion tool: [`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh)).
+  targeted `stop <service>` (compose project-name collision → EADDRINUSE that looks like a
+  perf regression; gated example: [`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh)).
 
 ## Files
 
 | file | role |
 |---|---|
-| `serve.sh` | ONE env-gated launcher for both variants (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless; overlay-only flags activate via env) |
+| `serve.sh` | ONE env-gated launcher for both variants (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless) |
 | `compose.yml` | one service, parameterized by `<host>.env`; run once per host, per variant |
-| `overlay.decode-max.yml` | the ONE optional overlay (image + env delta, ~20 lines); default config needs no overlay |
-| `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + KV budget + paths |
+| `overlay.decode-max.yml` | the ONE optional overlay (~20 lines); default needs no overlay |
+| `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + KV budget + paths (example identities — rename freely) |
 | `config.json` | checkpoint config override mounted at `/model/config.json` (`index_share_for_mtp_iteration=false`) |
 | `recipe.json` | machine-readable contract for the stock base variant |
-| `promotion-evidence.md` `qsa-selection-evidence.md` | raw campaign reports the numbers came from |
+| `promotion-evidence.md` `qsa-selection-evidence.md` | raw campaign reports behind the historical rows |
 
 ## Bring-up
 
-Prereqs (all four hosts): image present with matching image ID; weights at
-`/home/jasonc/models/Qwen3.8-Flash-Next-NVFP4`; `/dev/infiniband` devices; these dirs:
+Prereqs (all four hosts): the base image present with **identical image ID**
+(`docker image inspect -f '{{.Id}}'`, not tags); weights at `$MODEL_DIR` (root README step 2);
+`/dev/infiniband` devices; per-profile cache dirs:
 
 ```bash
-mkdir -p ~/.cache/qwen38-karmic-tp4-<date>-{vllm,triton,flashinfer,b12x}
+mkdir -p $CACHE_ROOT-{vllm,triton,flashinfer,b12x}   # names from <host>.env; fresh per profile
 ```
 
-Start **workers, then coordinator**; stop **coordinator, then workers**:
-
 ```bash
-D=qwen38-karmic-tp4-<date>
-for h in ampere faraday hertz; do
-  ssh $h "cd /home/jasonc/spark_vllm/deployments/$D && docker compose --env-file $h.env -p $D up -d"
+for h in $WORKERS; do
+  ssh $h "cd $DEPLOY_DIR && docker compose --env-file $h.env -p $PROJECT up -d"
 done
-ssh maxwell "cd /home/jasonc/spark_vllm/deployments/$D && docker compose --env-file maxwell.env -p $D up -d"
+ssh $COORDINATOR "cd $DEPLOY_DIR && docker compose --env-file $COORDINATOR.env -p $PROJECT up -d"
 ```
 
-Readiness = coordinator log line `Application startup complete`
-(`VLLM_ENGINE_READY_TIMEOUT_S=3600`; a cold-cache start compiles/tritons for ~10+ min;
-warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick.py`.
+Readiness = live API, not log grepping (`Application startup complete` false-passes on
+reused containers): `until curl -sf http://<coordinator>:8000/v1/models; do sleep 15; done`
+(`VLLM_ENGINE_READY_TIMEOUT_S=3600`; cold-cache start compiles/tritons ~10+ min, warm-cache
+restart minutes). Then `tools/smoke.sh` and `tools/bench-quick.py` before trusting anything.
 
 ## Memory contract
 
@@ -78,36 +84,14 @@ warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick
 | KV budget / rank (`KV_CACHE_MEMORY_BYTES`) | 45,097,156,608 B (42 GiB) |
 | GPU utilization | 0.80 (of GB10 unified memory as CUDA device) |
 | KV pool exposed | 5,486,463 tokens, effective block 1,424 |
-| MemAvailable floor under load | ≥16 GiB on the limiting rank (measured min 16.05 GiB, maxwell) |
+| MemAvailable floor under load | ≥16 GiB on the limiting rank (measured min 16.05 GiB) — violating it OOM-kills ranks (exit 137) during long prefill |
 | KV pool vs context limit | pool is aggregate capacity; per-request limit stays 262,144 |
 
-## Measured (campaign overlay image, FP8 KV, healthy arm)
+## KV dtype decision (FP8 default — deliberate, measured)
 
-| workload | value | results.jsonl ids |
-|---|---:|---|
-| prefill 8K | 4,421.5 tok/s | `tp4-qsa-selection-prefill-8k` |
-| prefill 64K | 4,276.9 tok/s | `tp4-qsa-selection-prefill-64k` |
-| prefill 128K | 3,834.5 tok/s | `tp4-qsa-selection-prefill-128k` |
-| decode C1 cold | 81.9 tok/s (MTP accept 53.5%) | `tp4-qsa-selection-decode-ctx0-c1` |
-| decode C8 cold | 336.2 tok/s aggregate | `tp4-qsa-selection-decode-ctx0-c8` |
-| decode C1 @8K | 82.2 tok/s | `tp4-qsa-selection-decode-ctx8k-c1` |
-| decode C8 @8K | 327.9 tok/s aggregate | `tp4-qsa-selection-decode-ctx8k-c8` |
+Head-to-head, same hardware/campaign ([`results.jsonl`](../data/results.jsonl)):
 
-**Live-fleet matched probe (bench-quick v3, 2026-09-26, same stack as this table's campaign
-arm):** serving-config cells `tp4-overlay-served-confirmation-20260926` + scaling rows
-`tp4-overlay-prefill-{8k,16k,32k,64k}` = 4,894±10 / 4,712 / 4,556 / 4,304 tok/s cold prefill;
-decode cold 75.0 C1 / 220.7 C8, primed-8K 73.3 C1 / 193.6 C8. With the operator engine-flag
-set (`overlay.yml`'s LM-head/MTP/overlap/fastpath block, `tp4-overlay-flags7-*`): prefill
-neutral (4,886±46), primed C8 **+8.4%** (209.8±19.5), C1 cells acceptance-dominated
-(cold 57.1±9.8 — random-token probe, wide CI, not a proven regression). Stock-base
-comparison cells: [`../COMPARISON.md`](../COMPARISON.md) (`tp4-stock-karmic-*`: 3,639 cold
-8K prefill, stronger primed-context decode).
-
-## KV dtype decision (FP8 vs BF16 — deliberate, not default)
-
-Measured head-to-head, same campaign, same hardware (`data/results.jsonl`):
-
-| cell | BF16 28 GiB | FP8 42 GiB (qsa-selection) | FP8 vs BF16 |
+| cell | BF16 28 GiB | FP8 42 GiB | FP8 vs BF16 |
 |---|---:|---:|---|
 | prefill 8K | 4,422.6 | 4,421.5 | −0.03% |
 | prefill 64K | 4,190.5 | 4,276.9 | **+2.1%** |
@@ -116,48 +100,41 @@ Measured head-to-head, same campaign, same hardware (`data/results.jsonl`):
 | decode C8 cold | 343.6 | 336.2 | −2.2% |
 | KV capacity/rank | 2,024,110 tok | 5,486,463 tok | **2.71×** |
 
-Two honest asterisks: (a) the promotion-day FP8 arm measured far slower (3,319 / 3,856 / 2,713;
-rows `tp4-fp8-kv42-*`) with unexplained variance never attributed — only the later
-steady-state arm above is representative; (b) FP8 KV carries the open LAVD quality issue
-(1 repeated-word loop + client timeout in 20 long-reasoning cases; MTP-off returned 7 exact +
-1 near with no loop in 8 requests, unattributable).
+Honest asterisks: (a) the promotion-day FP8 arm measured far slower (rows `tp4-fp8-kv42-*`)
+with unexplained variance never attributed — only the steady-state arm above is
+representative; (b) FP8 KV carries the open quality caveat (1 repeated-word loop + client
+timeout in 20 long-reasoning cases; MTP-off: no loop in 8 requests, unattributable — root
+README honesty box).
 
-**Decision: FP8 stays the published default** — parity-to-faster throughput at long context,
-2.71× concurrency headroom — with the loop risk disclosed; switch to the BF16 variant
-(pitfall 7) for long-reasoning-heavy or single-stream-latency-critical traffic.
+**FP8 stays the published default** (parity-to-faster at long context, 2.71× concurrency
+headroom) with the risk disclosed; for long-reasoning-heavy or single-stream-latency-critical
+traffic use the BF16 variant: `KV_CACHE_MEMORY_BYTES=30064771072`, `LOAD_FORMAT=instanttensor`,
+drop `--kv-cache-dtype`, everything else unchanged → 2,024,110-token pool at the BF16 rates above.
 
-## Verification gates passed (fleet, 2026-09-17/18 campaign + this re-validation)
+## Verification gates passed
 
-Re-validation on the **stock base image 2026-09-25** (`tools/smoke.sh` +
-`tools/long-prefix-check.py`, cold per-run prefixes): 4/4 behavior gates; 64K@C4 and 128K@C8
-shared-prefix + edited-tail cells PASS; changed-instructions-on-cached-context PASS; zero
-preemptions (exact `_total` counters); prefix-cache hit ratio 0.82–0.99 on shared prefixes;
-all four ranks `running restarts=0 oom=false`; MemAvailable 17 GiB (floor ≥16).
-Campaign-era deep validation on the overlay stack: 33/33 bounded behavior cases (arithmetic,
-tool call, prefix reuse, 8-/16-concurrent JSON retrieval at ~8K/64K/128K, changed instructions
-on cached context, vision); 26/26 long shared-prefix/history-edit checks. Full text:
-`qsa-selection-evidence.md`, `promotion-evidence.md`.
+Stock base image (current default), `tools/smoke.sh` + `tools/long-prefix-check.py`, cold
+prefixes: 4/4 behavior gates; 64K@C4 and 128K@C8 shared-prefix + edited-tail PASS;
+changed-instructions-on-cached-context PASS; zero preemptions (exact `_total` counters);
+prefix-cache hit ratio 0.82–0.99; all ranks `restarts=0 oom=false`; MemAvailable 17 GiB.
+Campaign-era deep validation (overlay stack): 33/33 behavior cases (arithmetic, tool calls,
+prefix reuse, 8/16-concurrent JSON retrieval at 8K/64K/128K, vision); 26/26 long shared-prefix
+checks — `qsa-selection-evidence.md`, `promotion-evidence.md`.
 
-## Pitfalls (each cost real time in the campaign)
+## Pitfalls (each cost real time)
 
 1. **Never share cache namespaces between profiles/dtypes.** FP8 vs BF16 KV select different
-   tuned kernels; a stale namespace silently changes kernels and invalidates A/B. The compose
-   mounts four per-profile cache dirs; create them fresh for a new profile.
-2. `NCCL_IB_MERGE_NICS=0` on this cabling; merging the two HCA functions breaks QP setup.
-3. `HC_TP` sharding (or `HC_PREFILL_MODE=shard` on the campaign image) is **TP4-only** —
-   TP2 must run replicated/off (see the tp2 recipe).
+   tuned kernels; a stale namespace silently changes kernels and invalidates A/B. Create the
+   four cache dirs fresh per profile.
+2. `NCCL_IB_MERGE_NICS=0` on dual-HCA cabling; merging the two HCA functions breaks QP setup.
+3. `HC_TP` sharding is **TP4-only** — TP2 must run replicated/off (see [`../tp2/`](../tp2/README.md)).
 4. The image may bake GLM-era env defaults; `serve.sh` unsets them. Keep those unsets.
-5. Big first-prefill variance on a fresh coordinator is a known flake (see root README honesty
-   box): re-measure a suspicious slow arm before drawing conclusions.
-6. FP8 KV quality limitation (LAVD loop) is documented in the root README — keep the BF16
-   fallback profile if your workload is long-reasoning-heavy.
-7. BF16-KV alternative: with `KV_CACHE_MEMORY_BYTES=30064771072` and no `--kv-cache-dtype`
-   override the same files reproduce the faster 28 GiB BF16 baseline (4,422.6 / 4,190.5 /
-   3,684.8 prefill; 85.6 C1) at 2,024,110-token capacity — set
-   `LOAD_FORMAT=instanttensor`, drop `kv_cache_dtype`, keep everything else.
-8. Stage the deployment directory (compose/serve/env/config) to **every** rank's own disk,
-   including the coordinator's — `docker compose` runs locally per host; peers being staged is
-   not enough. `tools/cutover-tp4.sh` now aborts before touching the fleet if any rank lacks
-   the files (this exact miss failed a real cutover once).
+5. Big first-prefill variance on a fresh coordinator is a known flake (one-off 2× MoE-kernel
+   stall seen once, cause unresolved): re-measure any suspiciously slow arm.
+6. Decode rates depend on MTP acceptance (cold C1 ranges 57–82 tok/s across regimes with the
+   SAME config): read `steps/s` and acceptance, not tok/s alone.
+7. Stage deployment files to **every** rank's own disk, including the coordinator's —
+   `docker compose` runs locally per host; peers being staged is not enough (`tools/cutover-tp4.sh`
+   aborts fleet-wide if any rank lacks the files; this exact miss once failed a real cutover).
 
 See `DETAILS.md` for every flag and env var with its why.

@@ -1,11 +1,11 @@
-# SparkRing (Fujitsu) vs this fleet — resolution and lever evidence
+# Qwen3.8-Flash-Next vs the reference stack (Fujitsu SparkRing) — scoreboard and lever evidence
 
 Source: [`FujitsuPolycom/sparkring`](https://github.com/FujitsuPolycom/sparkring)
 `profiles/` + `performance/records/` + `runtime/releases/`, pulled 2026-09-26.
 Same model, same hardware class: `qwen38-flash-next-qad-tp4` = Qwen3.8-Flash-Next NVFP4 QAD
 revision `629bc3218833a38b475b719f34aa571666f4a03e`, 262,144 ctx, 16 seqs, 8192 batched
-tokens, MTP3, FP8 KV, b12x backends, 4 Sparks. They are a switchless direct cycle; we are
-switched.
+tokens, MTP3, FP8 KV, b12x backends, 4 Sparks. Their testbed is a switchless direct cycle;
+this recipe's example fleet is switched.
 
 ## VERDICT 2026-09-26: the "author gap" was a measurement artifact — we match-or-lead on every like-for-like cell
 
@@ -15,16 +15,15 @@ distinguishes two decode metrics that our earlier campaign conflated:
 - `aggregate_wall_tps` — includes TTFT (what llm_decode_bench and any cold client measure)
 - `aggregate_decode_window_tps` — decode-window only, prefix-warm fixtures, TTFT excluded
 
-| cell (tok/s) | author r37 | this fleet (same methodology) | Δ |
+| cell (tok/s) | author r37 | this recipe (same methodology) | Δ |
 |---|---:|---:|---|
 | C1 decode **cold wall** | 53.5 (7.9K-token fixture; TTFT 1.80 s dominates) | **57.3–60.9** (stock+flags-off); **64.8** decode-max profile — but our `ctx0` cells are near-zero-prompt, so this row flatters us | weak-comparable |
 | C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | HISTORICAL images only: 75.9±24.9 (stock `64d4c3e0`), 87.5±10.7 (campaign `953b00ee`). **Current promoted config not yet measured realistic-prompt** — `tp4-bq-promoted-*` rows land after the LDB matrix series | parity on historical evidence; current-config cell pending |
 | C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **336.2** (campaign image `953b00ee`, N=3; current-image cell: see `tp4-ldb-promoted-*`) | lead, image-labelled |
 | prefill cold 16K | 3,394 (4.828 s / 16,384 tok, QAD-TP4-PREFILL.md) · 3,647–3,813 (r37) | **4,526–4,713** | **+24…+39%** |
-The mid-2026 rows in `SPARKRING.md` history ("author 4,853@8K … +6.6% gap") and the
-"73–89 tok/s C1" figures were **warm-window/relayed numbers**; raw JSON supersedes them.
-Rows `sparkring-author-*` were removed from `data/results.jsonl`; the authoritative author
-rows are `author-r37-*` (with wall + window + TTFT fields preserved).
+Earlier mid-2026 rows here ("author 4,853@8K, +6.6% gap"; "73–89 tok/s C1") were
+warm-window/relayed numbers — superseded by the raw JSON above. `data/results.jsonl` carries
+the authoritative author rows as `author-r37-*` (wall + window + TTFT fields preserved).
 
 Weights are NOT a factor: our `/models/Qwen3.8-Flash-Next-NVFP4` verified
 **byte-identical to their pinned QAD revision** (`sha256sum -c` of their profile
@@ -81,10 +80,11 @@ promotion (2.4–3% slower than patched NCCL); "assume transport speedup ⇒ app
 speedup" (their explicit caution). Switchless-only pins (`NCCL_SWITCHLESS_RING_ONLY`,
 Ring algo, 4-HCA lists, opposite-path b12x) are N/A on our switched fabric.
 
-## Open threads
+## Open question to the reference authors
 
-- Ask the author for their **fast-matrix LDB `steps/s (accept len)` row** — the only datum
-  that would let us attribute their warm-window decode behavior between steps and
-  acceptance. Not blocking: cold-wall parity is already established.
-- V2 model runner: pinning `VLLM_USE_V2_MODEL_RUNNER=0` crashes engine init on this stack
-  (legacy path lacks `Qwen3_8FlashNextConfig.image_token_index`) — never pin off.
+- Their **fast-matrix LDB `steps/s (accept len)` row** is the only datum that would
+  attribute their warm-window decode behavior between steps and acceptance. Not blocking:
+  cold-wall parity is already established.
+- Recipe invariant discovered the hard way: pinning `VLLM_USE_V2_MODEL_RUNNER=0` crashes
+  engine init on this stack (legacy path lacks `Qwen3_8FlashNextConfig.image_token_index`)
+  — never pin off.
