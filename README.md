@@ -96,15 +96,6 @@ ssh maxwell 'docker logs -f qwen38-karmic-tp4-<date>-0'
 Stop order is the reverse (coordinator first). Startup/stop order is not optional: rank-0
 serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29507`.
 
-## Repo map
-
-| path | what |
-|---|---|
-| [`tp4/`](tp4/README.md) | four-Spark recipe: README, DETAILS (every env var + flag), runnable files |
-| [`tp2/`](tp2/README.md) | two-Spark recipe (maxwell+ampere) |
-| [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
-| [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
-| [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
 ## Fleet state (2026-09-26)
 
 **Serving: Path B campaign overlay** (`spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1`,
@@ -118,7 +109,16 @@ Rollback = `docker compose --env-file <host>.env -p qwen38-karmic-tp4-20260925 u
 "overlay regression" was stock still bound to :8000 (EADDRINUSE on the overlay coordinator);
 always `compose down` and gate on port release.
 
-| `SPARKRING.md` | applicability of Fujitsu sparkring profile levers to this fleet (verified envs, test order, retained negatives) |
+## Repo map
+
+| path | what |
+|---|---|
+| [`tp4/`](tp4/README.md) | four-Spark recipe: README, DETAILS (every env var + flag), runnable files |
+| [`tp2/`](tp2/README.md) | two-Spark recipe (maxwell+ampere) |
+| [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
+| [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
+| [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
+| [`SPARKRING.md`](SPARKRING.md) | applicability of Fujitsu sparkring profile levers to this fleet (verified envs, test order, retained negatives) |
 | `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
 | `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
 | `llms.txt` | agent entry point |
