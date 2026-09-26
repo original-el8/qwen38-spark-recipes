@@ -63,6 +63,27 @@ warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick
 
 Stock-base (karmic-nightly) cells are in `../COMPARISON.md`.
 
+## KV dtype decision (FP8 vs BF16 — deliberate, not default)
+
+Measured head-to-head, same campaign, same hardware (`data/results.jsonl`):
+
+| cell | BF16 28 GiB | FP8 42 GiB (qsa-selection) | FP8 vs BF16 |
+|---|---:|---:|---|
+| prefill 8K | 4,422.6 | 4,421.5 | −0.03% |
+| prefill 64K | 4,190.5 | 4,276.9 | **+2.1%** |
+| prefill 128K | 3,684.8 | 3,834.5 | **+4.1%** |
+| decode C1 cold | 85.6 | 81.9 | −4.3% |
+| decode C8 cold | 343.6 | 336.2 | −2.2% |
+| KV capacity/rank | ≈2.02M tok | 5,486,463 tok | **≈2.71×** |
+
+Two honest asterisks: (a) the promotion-day FP8 arm measured far slower (3,319 / 3,856 / 2,713;
+rows `tp4-fp8-kv42-*`) with unexplained variance never attributed — only the later
+steady-state arm above is representative; (b) FP8 KV carries the open LAVD quality issue
+(1 repeated-word loop + client timeout in 20 long-reasoning cases; 8/8 clean at MTP-off).
+**Decision: FP8 stays the published default** — parity-to-faster throughput at long context,
+2.71× concurrency headroom — with the loop risk disclosed; switch to the BF16 variant
+(pitfall 7) for long-reasoning-heavy or single-stream-latency-critical traffic.
+
 ## Verification gates passed (fleet, 2026-09-17/18 campaign + this re-validation)
 
 33/33 bounded behavior cases (arithmetic, tool call via `qwen3_xml`, prefix reuse, 8- and
