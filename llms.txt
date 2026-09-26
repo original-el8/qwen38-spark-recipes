@@ -4,10 +4,13 @@ Purpose: reproduce our serving setup exactly, on any 2- or 4-node DGX Spark flee
 dual-NIC RoCE fabric.
 
 Read order:
-1. `tp4/recipe.json` or `tp2/recipe.json` — machine-readable contract (hosts, ranks, digests,
-   flags, env, orders, gates).
-2. `tp4/serve.sh` + `tp4/compose.yml` + `tp4/*.env` — the runnable set (compose is
-   topology-parameterized; tp2 dir ships ready 2-node envs).
+1. `tp4/overlay/` or `tp2/overlay/` — DEFAULT serving config (Path B campaign overlay, live
+   on this fleet 2026-09-26): compose.yml + serve.sh + <host>.env + profile.json verbatim.
+   Rebuild its image via `build/README.md`. Fallback/stock variant (goal's base-image recipe,
+   Path A): `tp4/` + `tp2/` root files with their `recipe.json` contracts.
+2. `tp4/serve.sh` + `tp4/compose.yml` + `tp4/*.env` — the stock runnable set (compose is
+   topology-parameterized; tp2 dir ships ready 2-node envs). Validation/promotion with gates:
+   `tools/cutover-campaign.sh`, `tools/tp2-campaign-validate.sh`, `tools/campaign-ab-probe.sh`.
 3. `tp4/DETAILS.md` — per-flag/per-env rationale; `*/README.md` — operations + pitfalls.
 4. `data/results.jsonl` — every published number; `data/README.md` — measurement method.
 5. `build/README.md` — image provenance: stock `eugr/spark-vllm-b12x` nightly (default) vs
