@@ -41,7 +41,7 @@ Headline, measured and certified:
 - MTP speculative serving = **1.6–1.8x** over the non-spec reference (90–103 vs 56.6 tok/s, C1 temp-0).
 - The lever is **merge quality**: a true three-way merge onto current nightly (6 clean merges, 1 conflict resolved on kernel-fusion evidence) lifts acceptance from 1.84 to 2.4–2.85. Fuzz-applied patches had been silently reverting nightly's fused checkpoint path.
 - `draft_sample_method="probabilistic"`: irrelevant at temp-0, **+42% at temp-1** (82.4 vs 57.8) — it reproduces the upstream author's high-80s cell and explains it.
-- Coalesce: tested =1 after the ship-set fix — the GDN gate heals the validator and the engine boots, but decode regresses (77.0 @ 2.15 accept vs 87–97 @ 2.36–2.61). Keep it 0. `HC_PREFILL_MODE`: a dead flag in every image that ever shipped it. The withdrawn 4,354 prefill row fails replication; it stays withdrawn.
+- Coalesce: still untested =1 — two false starts traced to coordinator-copy edits vs rank-0 ship source; every measured cell ran 0 (band 77–97.5 tok/s, accept 2.15–2.85). `HC_PREFILL_MODE`: a dead flag in every image that ever shipped it. The withdrawn 4,354 prefill row fails replication; it stays withdrawn.
 - Byte-exact temp-0 determinism does not exist on this fork under continuous batching; the repo's correctness oracle is argmax-logprob exactness, with any cross-config text diff judged against the same-engine drift band (2–373 chars).
 
 Reproduce: `recipes/RECIPE.md` (build + flags + protocol). Cycles: `tools/ldb-fast-matrix.sh` (now with cross-rank content-divergence gate baked in).
