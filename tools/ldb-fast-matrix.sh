@@ -35,7 +35,9 @@ for h in maxwell ampere faraday hertz; do
 done
 
 echo "== [$NAME] ship overlays to every rank + VERIFY (single-dest scp per host)"
-for f in "$@"; do
+FILES=("$@")
+[ "${#FILES[@]}" = 0 ] && FILES=("$STG/compose.yml" "$STG/serve.sh" "$STG/config.json")
+for f in "${FILES[@]}"; do
   b=$(basename "$f")
   for h in ampere faraday hertz; do
     scp -3 -q "maxwell:$STG/$b" "$h:$STG/" || { echo "FAIL-SHIP:$h/$b"; exit 1; }
