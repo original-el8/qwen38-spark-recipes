@@ -105,6 +105,19 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 | [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
 | [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
 | [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
+## Fleet state (2026-09-26)
+
+**Serving: Path B campaign overlay** (`spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1`,
+ID `953b00ee`) as `qwen38-qsa-selection-20260917-{0..3}`, API `maxwell:8000`. Promoted after
+matched A/B showed +34% cold prefill; confirmed live with image-manifest + RoCEnante markers
+and bench (cold prefill 4,894±10 @8K, 4,712 @16K, 4,556 @32K, 4,304 @64K; cold per-run).
+Rollback = `docker compose --env-file <host>.env -p qwen38-karmic-tp4-20260925 up -d` per host
+(stock stopped intact; its compose/env unchanged in `tp4/`). Promotion tool: `tools/cutover-campaign.sh`
+(port-release gate + capture-wait + performance gate + auto-rollback). Cutover lesson recorded:
+`compose stop <service>` with a guessed service name silently no-ops — the 2026-09-26 false
+"overlay regression" was stock still bound to :8000 (EADDRINUSE on the overlay coordinator);
+always `compose down` and gate on port release.
+
 | `SPARKRING.md` | applicability of Fujitsu sparkring profile levers to this fleet (verified envs, test order, retained negatives) |
 | `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
 | `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
