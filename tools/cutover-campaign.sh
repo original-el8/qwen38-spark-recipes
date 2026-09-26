@@ -45,6 +45,25 @@ for i in $(seq 1 110); do
 done
 [ "$READY" = 1 ] || { echo "FAIL: readiness cap"; ssh maxwell "docker logs --tail 40 $CPROJ-0"; restore_stock; exit 1; }
 
+echo "== wait cudagraph capture completion (post-200 capture runs minutes; probing pre-capture measures eager path)"
+CAP=0
+for i in $(seq 1 60); do
+  ssh maxwell "docker logs $CPROJ-0 2>&1 | grep -qiE 'Graph capturing finished|graph capture.*done|Capturing CUDA graphs.*finished'" && { CAP=1; break; }
+  sleep 15
+done
+[ "$CAP" = 1 ] || echo "WARN: capture-complete line not seen within 15 min; proceeding (warmup probe will absorb it)"
+
+echo "== warmup (throwaway prefill+decode to fully JIT/MTP-warm the engine)"
+python3 - <<WARM
+import json, urllib.request, time
+req = urllib.request.Request("http://maxwell:8000/v1/completions",
+  data=json.dumps({"model":"Qwen3.8-Flash-Next","prompt":[i*2654435761 % 150000 + 1000 for i in range(4096)],
+                   "max_tokens":64,"temperature":0.0}).encode(),
+  headers={"content-type":"application/json"})
+t0=time.monotonic(); json.load(urllib.request.urlopen(req, timeout=900))
+print("warmup ok in %.1fs" % (time.monotonic()-t0))
+WARM
+
 echo "== smoke"
 # smoke.sh takes the served name as $1 (not the endpoint): positional here = model name
 if ! ENDPOINT=http://maxwell:8000/v1 bash /tmp/spark-vllm-recipes/tools/smoke.sh; then
