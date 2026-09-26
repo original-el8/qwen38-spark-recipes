@@ -45,7 +45,7 @@ Like-for-like (full table + reasoning: [`SPARKRING.md`](SPARKRING.md)):
 | cell | author r37 | this recipe | verdict |
 |---|---:|---:|---|
 | prefill cold 16K | 3,394–3,813 | 4,4–4,7xx | **+24…+39%** |
-| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | 87.5±10.7 (historical image); current-config pending | parity on current evidence |
+| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | 87.5±10.7 (historical image); current-config pending | parity on historical evidence |
 | C8 decode | 255–259.5 warm wall | 336.2 (campaign image); current pending | lead (image-labelled) |
 
 Env-level levers we A/B'd against the default (one variable per run, same instrument):
