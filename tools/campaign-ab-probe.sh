@@ -31,7 +31,8 @@ for r in 1 2 3 0; do h=$(host_of $r)
 done
 
 echo "== wait readiness (campaign coordinator container)"
-C0=$(ssh maxwell "cd $CDIR && docker compose -p $CP ps --format '{{.Name}}' | head -1")
+C0=$(ssh maxwell "cd $CDIR && docker compose -p $CP ps --format '{{.Name}}' | grep -E -- '-0\$' | head -1")
+[ -n "$C0" ] || { echo 'FAIL: coordinator container not resolvable'; restore_stock; exit 1; }
 echo "coordinator container: $C0"
 READY=0
 START_TS=$(date -u +%s)
