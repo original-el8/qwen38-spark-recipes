@@ -43,7 +43,9 @@ ssh maxwell "cd /home/jasonc/spark_vllm/deployments/$D && docker compose --env-f
 | decode C8 @8K | 226.6 tok/s aggregate | `tp2-qsa-selection-decode-ctx8k-c8` |
 
 26/26 exact shared-prefix and history-edit checks; min MemAvailable 22.27 GiB (maxwell) /
-25.25 GiB (ampere). Stock-base (karmic-nightly) cells: `../COMPARISON.md`.
+25.25 GiB (ampere). Stock-base re-validation 2026-09-25 (image `64d4c3e0`, this dir's files verbatim, maxwell+ampere):
+smoke 4/4; probe cells `tp2-stock-karmic-*` in `../data/results.jsonl` — cold 8K prefill
+3,269.6 ± 12.2 tok/s (0.90× TP4-stock under this probe), decode C1 47.7, C8 154.0.
 
 ## When to use tp2
 
