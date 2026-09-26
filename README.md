@@ -47,7 +47,7 @@ Like-for-like (full table + reasoning: [`SPARKRING.md`](SPARKRING.md)):
 |---|---:|---:|---|
 | prefill cold 16K | 3,394–3,813 | **3,575** (high-cluster 4,5–4,7xx intermittent, unattributed) | parity, +0…5% (high cluster: +19…+39%) |
 | C1 decode cold wall (ctx0) | 53.5 | **63.3–64.3** (steps/s 36.1) | **+18…+20%** (their fixture carries TTFT; weak-comparable) |
-| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | current-config cell in flight; historical: 87.5±10.7 | parity on historical evidence |
+| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window (prefix-cached replays) | **58.3 current config** (`tp4-ldb-promoted-realistic-decode-c1`) | NOT parity on current config (−29%); their cell is warm-replay-heavy — regime split pending the attribution arm |
 | C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **249.2** (ctx0 cold) | big lead vs their cold wall; ≈parity vs warm wall (−3%) |
 
 Env-level levers A/B'd against the default (one variable per run, same instrument):

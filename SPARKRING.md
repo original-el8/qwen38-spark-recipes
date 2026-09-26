@@ -7,7 +7,7 @@ revision `629bc3218833a38b475b719f34aa571666f4a03e`, 262,144 ctx, 16 seqs, 8192 
 tokens, MTP3, FP8 KV, b12x backends, 4 Sparks. Their testbed is a switchless direct cycle;
 this recipe's example fleet is switched.
 
-## VERDICT 2026-09-26: the "author gap" was a measurement artifact — we match-or-lead on every like-for-like cell
+## VERDICT 2026-09-26: the "author gap" was largely a measurement artifact — match-or-lead on cold-wall, prefill, and C8 cells; the realistic-fixture C1 cell is BELOW on the current config (attribution in flight)
 
 Their own machine-readable record `performance/records/qwen38-flash-next/r37-shared-tp4.json`
 distinguishes two decode metrics that our earlier campaign conflated:
@@ -18,7 +18,7 @@ distinguishes two decode metrics that our earlier campaign conflated:
 | cell (tok/s) | author r37 | this recipe (same methodology) | Δ |
 |---|---:|---:|---|
 | C1 decode **cold wall** | 53.5 (7.9K-token fixture; TTFT 1.80 s dominates) | **63.3–64.3** ctx0 (steady, 2 repeats; steps/s 36.1) — ctx0 flatters us slightly | **+18…+20%**, weak-comparable |
-| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | current config running the same realistic dataset through llm_decode_bench NOW (`tp4-bq-promoted-*` lands tonight); historical images: 75.9±24.9 stock, 87.5±10.7 campaign | parity on historical evidence; current cell in flight |
+| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | **58.3 / 57.9 (current config, `tp4-ldb-promoted-realistic-*`)**; historical: 75.9±24.9 stock-era, 87.5±10.7 campaign image | **below by −29%** on current config; warm-replay share of their fixture unknown — spec-off attribution arm decides whether combo-interaction or regime explains it |
 | C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **249.2** ctx0 cold, steps-tier same as C1 | lead vs their cold wall; ≈parity vs warm wall (−3%) |
 | prefill cold 16K | 3,394 (4.828 s / 16,384 tok, QAD-TP4-PREFILL.md) · 3,647–3,813 (r37) | **3,575** steady (×2 repeats); high tuning cluster 4,5–4,7xx intermittent, unattributed | parity +0…5% (high cluster +19…+39%) |
 Earlier mid-2026 rows here ("author 4,853@8K, +6.6% gap"; "73–89 tok/s C1") were
