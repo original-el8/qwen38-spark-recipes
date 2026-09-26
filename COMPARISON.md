@@ -35,9 +35,11 @@ Rows: `data/results.jsonl` ids `tp4-stock-karmic-*` / `tp4-campaign-overlay-prob
 - **Path B wins the headline cells decisively**: +34% on cold 8K prefill, +15–16% cold decode.
   That gap is the campaign's own merged-and-local work (HC token-ownership prefill, QSA
   selection fusion, MoE padding, plus newer b12x `master` than the nightly was built with at
-  campaign time). If long-prefill throughput is your bottleneck, the overlay is measurably
-  better and fully reconstructable (build contexts + image dist archives retained on the build
-  host, `/home/jasonc/spark_vllm/build-contexts/<tag>/`, `~/.cache/*-distribute.tar.zst`).
+  campaign time). If long-prefill throughput is your bottleneck, the overlay was
+  measurably better — **moot since 2026-09-26**: the current public nightly carries the
+  same content. (Historical build contexts + dist archives are retained **fleet-local**
+  only — `/home/jasonc/spark_vllm/build-contexts/<tag>/` — and are NOT published; see the
+  reproducibility note in [`build/README.md`](build/README.md).)
 - **Path A wins primed-context decode** (−13.6% / −25.7% for the overlay). Two plausible
   contributors, not separated by this probe: the stock nightly's newer b12x master kernels,
   and `VLLM_QWEN3_8_FLASH_NEXT_MTP_COMPACT` (default-on stock; absent campaign) changing MTP

@@ -112,15 +112,18 @@ retired, its content absorbed by this nightly). Deploy dir
 `maxwell:8000`. Fast-matrix cells: prefill 8K 4,35x / 16K up to 4,704 / 128K 3,825; cold
 decode C1 56.6–58.8 (`tp4-ldb-*` rows).
 
-**Author scoreboard** ([`SPARKRING.md`](SPARKRING.md)): this config beats the Fujitsu
-sparkring r37 reference on every like-for-like cell — cold-wall C1 decode 53.5 → ours
-57.3+, C8 255–259 → ours 336, cold prefill 3,65x–3,81x → ours 4,4–4,7xx. The previously
-believed "author gap" was warm-window vs cold-wall metric conflation, now fixed in
-`data/results.jsonl` (`author-r37-*` rows carry wall + window + TTFT).
+**Author scoreboard** ([`SPARKRING.md`](SPARKRING.md)): this config **matches-or-beats**
+the Fujitsu sparkring r37 reference on like-for-like cells — realistic-prompt C1 decode
+parity (campaign 87.5 vs their 81.9 warm-wall), C8 336 vs 255–259 warm (campaign-image
+row; current-image C8 in `tp4-ldb-promoted-*`), cold prefill 3,65x–3,81x → ours
+4,4–4,7xx (+24…+39%). The previously believed "author gap" was warm-window vs cold-wall
+metric conflation, now fixed in `data/results.jsonl` (`author-r37-*` rows).
 
 Optional profile: [`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml) — newer b12x
 wheel over the same nightly + engine-flag suite + block32: C1 **64.8 tok/s** (steps/s 37.0,
 +18%), prefill ≈author-level. Build recipe + wheel sha256 in the overlay header.
+**Experimental**: mainline b12x drops eugr's fork patches — smoke-verified, not
+quality-qualified.
 
 Variant switching stays gated: `down` on all hosts → wait for :8000 release → `up`
 (`tools/cutover-campaign.sh` pattern; `compose stop <service>` with a guessed name silently
@@ -135,7 +138,7 @@ no-ops — gate on port release, always).
 | [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
 | [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
 | [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
-| [`SPARKRING.md`](SPARKRING.md) | Fujitsu sparkring parity resolution: author r37 scoreboard (we lead cold-wall on every cell), env-lever verdict table, b12x pairing law, retained negatives |
+| [`SPARKRING.md`](SPARKRING.md) | Fujitsu sparkring parity resolution: author r37 scoreboard (match-or-lead; realistic-decode parity, prefill +24…+39%), env-lever verdict table, b12x pairing law, retained negatives |
 | `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
 | `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
 | `llms.txt` | agent entry point |

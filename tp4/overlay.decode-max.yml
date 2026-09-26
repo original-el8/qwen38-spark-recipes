@@ -11,6 +11,9 @@
 # NOTE: older mainline wheels (e.g. d5139035 / PR #394) FAIL startup with this vLLM:
 #   'TuningRequirement' object has no attribute 'rejected_count' — the eugr b12x line is
 #   diverged from b12x main (17 ahead / 13 behind), not a subset. Only 2026-09-26+ main satisfies the API.
+# EXPERIMENTAL: this wheel is b12x MAINLINE — it lacks eugr's 17 fork-ahead commits
+# (GB10/Spark-specific fixes). Smoke passed (arithmetic/tool-calls/vision); full
+# behavioral/quality qualification NOT run. Shipped default avoids this trade.
 services:
   qwen38-flash-next:
     image: spark-vllm:qwen38-b12xe39b437b-nightly20260925-r1

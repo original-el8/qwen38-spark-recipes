@@ -61,6 +61,17 @@ After pulling on every host, require the same **image ID** everywhere
 
 ## Path B — fleet overlay images (campaign-built, historical measurements)
 
+> **Reproducibility note (external users):** the two campaign images below are NOT
+> publicly obtainable. `spark-vllm:*` tags were built and distributed fleet-only (never
+> pushed to any registry); vLLM campaign commit `76061de4…` was post-merge LOCAL work on a
+> `codex/*` branch that was never pushed (it 404s in the public repo even though
+> `dev/karmic-kraken` itself lives), and b12x branch `codex/qwen-moe-decode-20260916`
+> (`72baebbd`) was deleted (`d2d5368d` survives as a commit object). Do not try to pull
+> any of it. The lineage is historical and RETIRED: its entire delivered content is in
+> the public `eugr/spark-vllm-b12x:nightly-20260925`, which is the shipped default. The
+> only externally reproducible rebuild documented from this repo is the **decode-max**
+> overlay (public nightly + public b12x release wheel — see
+> [`../tp4/overlay.decode-max.yml`](../tp4/overlay.decode-max.yml)).
 The 2026-09-16/17 optimization campaign measured on images built as **CPU-only source
 overlays** on a pinned parent chain (never from a hub pull at build time):
 
@@ -109,7 +120,9 @@ time and was never pushed; the fleet images must also not recompile kernels per 
 The exact overlay inputs remain on maxwell: build contexts under
 `/home/jasonc/spark_vllm/build-contexts/<image-tag>/` (source tars, Dockerfile, manifest) and
 peer-distribution archives `~/.cache/<image-tag>-distribute.tar.zst`. Path B is therefore
-reconstructable byte-exactly without re-deriving the source branches.
+reconstructable byte-exactly **by the fleet** without re-deriving the source branches —
+these archives live only on maxwell; external users should serve the public nightly
+(Path A) or the decode-max overlay instead.
 
 ## Open questions tracked by the fleet (not blockers)
 

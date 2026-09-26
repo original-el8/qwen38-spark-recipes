@@ -23,9 +23,12 @@ docker compose --env-file <host>.env -p <project> -f overlay.decode-max.yml up -
 ```
 
 - **Default** → prefill champion (16K 4,704; 128K 3,825) + cold C1 56.6–58.8; author
-  scoreboard in [`../SPARKRING.md`](../SPARKRING.md) — leads every like-for-like cell.
+  scoreboard in [`../SPARKRING.md`](../SPARKRING.md) — match-or-lead on every comparable
+  cell (realistic-prompt decode parity; prefill +24…+39%).
 - **Decode-max overlay** → C1 64.8 tok/s (steps/s 37.0); prefill ≈author-level. Same
   weights, same base tag; the delta is a sha256-pinned b12x wheel + engine-flag envs.
+  EXPERIMENTAL: mainline b12x drops eugr's 17 fork-ahead (GB10/Spark) commits —
+  smoke-passed, not behavior-qualified.
 - `serve.sh` is one env-gated script for all variants (`ATTENTION_BACKEND`,
   `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ default behavior;
   `MTP_BACKENDS_IN_SPEC=0` opts out of b12x spec backends; `ASYNC_SCHED=0` off).
