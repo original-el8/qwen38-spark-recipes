@@ -5,16 +5,31 @@ Source: [`FujitsuPolycom/sparkring`](https://github.com/FujitsuPolycom/sparkring
 They serve the **same model** (`qwen38-flash-next-qad-tp4` = Qwen3.8-Flash-Next NVFP4,
 262,144 ctx, 16 seqs, 8192 batched tokens, MTP3, FP8 KV, b12x backends) on 4 Sparks in a
 **switchless direct cycle**. We are **switched** — their ring-specific pins are N/A for us;
-engine-side levers are not. Their own published QAD TP4 prefill (~3,785–3,813 tok/s @16K) is
-**below our campaign overlay** (measured 4,885 @8K, `COMPARISON.md`), so this is a menu of
-extra toggles, not a recipe to adopt wholesale.
+engine-side levers are not. **UPDATED 2026-09-26 — the author's current numbers beat our
+overlay at mid/long context** (external rows `sparkring-author-*`, `data/results.jsonl`):
+
+| ctx | author prefill | ours (overlay+flags) | Δ |
+|---|---:|---:|---:|
+| 8K | 4,853 | 4,886±46 | parity |
+| 16K | 4,923 | 4,712 | **+4.5%** |
+| 32K | 4,821 | 4,556 | **+5.8%** |
+| 64K | 4,589 | 4,304 | **+6.6%** |
+| 128K | 4,110 | unmeasured — fill this cell | ? |
+
+Their C1 decode: 73.3 cold, 88.1@16K, 77.1@32K, 89.0@64K, 74.3@128K (realistic-prompt
+acceptance; our random-token probe reads low by construction). The gap's SHAPE — zero at
+8K, growing monotonically with context — is the signature of big-message collectives
+(84–168 MiB all-reduce is exactly this class), and +4.5–6.6% matches their patched-NCCL
+prefill claim (+5.0–6.8%) almost exactly. But their delta is one arm: block-size 32,
+dispatch `both`, async-off, gmu 0.85, OMP hygiene ride along — undecomposable from here;
+our one-variable A/Bs can.
 
 ## APPLIES — cheap env/flag A/Bs against the Path B overlay (test one variable per run)
 
 | Lever | Theirs (verbatim, `profiles/qwen38-flash-next-qad-tp4/config.json`) | Ours | Their reported effect |
 |---|---|---|---|
-| NVFP4 MTP proposal head | `VLLM_MTP_NVFP4_LM_HEAD=1`, `VLLM_LM_HEAD_A16=1` | not set | GLM MTP3 profile records +8.2% C1 raw decode; same mechanism class as our MTP_COMPACT |
-| MTP overlap | `VLLM_QWEN3_8_FLASH_NEXT_OVERLAP=1` | not set (stock has `MTP_COMPACT=1` only) | shipped-on in their profile; no isolated delta published |
+| NVFP4 MTP proposal head | `VLLM_MTP_NVFP4_LM_HEAD=1`, `VLLM_LM_HEAD_A16=1` | **LIVE** (flag set 2026-09-26) | GLM MTP3 profile records +8.2% C1 raw decode; same mechanism class as our MTP_COMPACT |
+| MTP overlap | `VLLM_QWEN3_8_FLASH_NEXT_OVERLAP=1` | **LIVE** (flag set) | shipped-on in their profile; no isolated delta published |
 | Size-based collective dispatch | `QWEN_DISPATCH_MODE=both`, `QWEN_DISPATCH_AR_BYTES=20480`, `QWEN_DISPATCH_TRACE=0` | image defaults only (`VLLM_ROCE_ALLREDUCE_MAX_SIZE=2MB`, `ALLGATHER_MAX_SIZE=16MB` — numerically the same ceilings) | policy A/B record selected `mode=both`; ours may already be equivalent — check `QWEN_DISPATCH_TRACE=1` before believing either way |
 | KV block size | `--block-size 32` | 16 | no delta published; interacts with FP8-KV page layout + prefix-cache hit granularity — measure |
 | VRAM ceiling | `--gpu-memory-utilization 0.85` | 0.80 | capacity, not speed; watch MemAvailable floor ≥16 GiB |
@@ -79,9 +94,19 @@ campaign record ever evaluated it and the original runners defaulted it ON.
 
 ## Test order on this fleet (one variable per run, bench-quick v3 + long-prefix gate)
 
-1. `VLLM_MTP_NVFP4_LM_HEAD=1` + `VLLM_LM_HEAD_A16=1` (decode C1/C8 + acceptance)
-2. `VLLM_QWEN3_8_FLASH_NEXT_OVERLAP=1`
-3. `--block-size 32` (prefill scale + prefix-cache hits + KV capacity re-pin)
-4. async-scheduling OFF vs ON
-5. `NCCL_CROSS_NIC=1`, spec-config backends
-6. allocator/OMP hygiene as free wins if 1–5 are neutral
+1–2. ~~MTP NVFP4 head / overlap~~ **DONE 2026-09-26** — live in both overlays (operator
+   flag set); TP4 prefill neutral, primed-C8 +8.4%; TP2 neutral in all cells (verified arms).
+3. **`NCCL_CROSS_NIC=1`** — promoted to FIRST after the author's context-scaling gap
+   (transport-class signature). Our switched dual-port fabric is where this env has real
+   upside: NCCL is the >2 MB fallback path and the all-gather-heavy prefill collective.
+4. `--block-size 32` (their shipped value; re-pin prefix hits + KV capacity via
+   `tools/long-prefix-check.py`)
+5. async-scheduling OFF vs ON — `tp4/serve.sh` passes it UNCONDITIONALLY; toggle needs a
+   staged serve.sh variant (`sed '/--async-scheduling/d'`), NOT an env overlay
+6. `QWEN_DISPATCH_MODE=both` + `QWEN_DISPATCH_AR_BYTES=20480` (TRACE=1 first, their own
+   doc's advice; spec-config backends ride here)
+7. allocator/OMP hygiene (`expandable_segments:True`, `OMP_NUM_THREADS=16`,
+   `NCCL_IGNORE_CPU_AFFINITY=1`) as free wins if 3–6 are neutral
+
+New cells the author's curve exposes: **tp4-overlay prefill-128K** (their 4,110 is the
+benchmark — we've never filled 128K on the overlay) and context-swept C1 decode.
