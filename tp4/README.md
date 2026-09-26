@@ -111,5 +111,9 @@ all ranks healthy with matching image ID after each matrix. Full text:
    override the same files reproduce the faster 28 GiB BF16 baseline (4,422.6 / 4,190.5 /
    3,684.8 prefill; 85.6 C1) at 2,024,110-token capacity — set
    `LOAD_FORMAT=instanttensor`, drop `kv_cache_dtype`, keep everything else.
+8. Stage the deployment directory (compose/serve/env/config) to **every** rank's own disk,
+   including the coordinator's — `docker compose` runs locally per host; peers being staged is
+   not enough. `tools/cutover-tp4.sh` now aborts before touching the fleet if any rank lacks
+   the files (this exact miss failed a real cutover once).
 
 See `DETAILS.md` for every flag and env var with its why.
