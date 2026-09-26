@@ -15,4 +15,7 @@ services:
       VLLM_GDN_SPEC_DECODE_METADATA_FASTPATH: "1"
       ATTENTION_BACKEND: B12X
       RECURRENT_CHECKPOINT_POLICY: aligned
-      VLLM_USE_V2_MODEL_RUNNER: "0"
+      # V2 runner: this model REQUIRES the V2 model runner — pinning "0" crashes at
+      # engine init (legacy path lacks Qwen3_8FlashNextConfig.image_token_index; live
+      # crash 2026-09-26). Base compose ships "1" = what the campaign's unset(None=auto)
+      # resolved to, so DO NOT override here.
