@@ -14,7 +14,7 @@ tokens).
 # workers first (ampere, faraday, hertz), coordinator (maxwell) last — on each host:
 cd $DEPLOY_DIR   # staged copy of these files + config.json + serve.sh
 docker compose --env-file <host>.env -p <project>          [-f overlay.yml] up -d
-docker compose --env-file <host>.env -p <project> [-a?]   # stop = down, name-safe
+docker compose --env-file <host>.env -p <project>          [-f overlay.yml] down   # name-safe stop
 ```
 
 - **Without `-f overlay.yml`** → stock base `eugr/spark-vllm-b12x:nightly-20260925`
@@ -34,11 +34,13 @@ docker compose --env-file <host>.env -p <project> [-a?]   # stop = down, name-sa
 
 | file | role |
 |---|---|
-| `serve.sh` | in-container launch (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless) |
-| `compose.yml` | one service, parameterized by `<host>.env`; run once per host |
-| `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + per-profile caps |
+| `serve.sh` | ONE env-gated launcher for both variants (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless; overlay-only flags activate via env) |
+| `compose.yml` | one service, parameterized by `<host>.env`; run once per host, per variant |
+| `overlay.yml` | the COMPLETE image+env overlay delta (`docker compose -f compose.yml -f overlay.yml`) |
+| `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + KV budget + paths |
 | `config.json` | checkpoint config override mounted at `/model/config.json` (`index_share_for_mtp_iteration=false`) |
-| `profile.json` | machine-readable manifest of the whole runtime contract |
+| `profile.overlay.json` | machine-readable manifest of the overlay runtime (image ID, cache namespaces, orders) |
+| `recipe.json` | machine-readable contract for the stock base variant |
 | `promotion-evidence.md` `qsa-selection-evidence.md` | raw campaign reports the numbers came from |
 
 ## Bring-up
@@ -86,9 +88,15 @@ warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick
 | decode C1 @8K | 82.2 tok/s | `tp4-qsa-selection-decode-ctx8k-c1` |
 | decode C8 @8K | 327.9 tok/s aggregate | `tp4-qsa-selection-decode-ctx8k-c8` |
 
-Stock-base (karmic-nightly) probe cells and the A/B verdict against this table are in
-[`../COMPARISON.md`](../COMPARISON.md) (`tp4-stock-karmic-*` rows: 3,639 cold 8K prefill,
-primed-context decode stronger than the overlay).
+**Live-fleet matched probe (bench-quick v3, 2026-09-26, same stack as this table's campaign
+arm):** serving-config cells `tp4-overlay-served-confirmation-20260926` + scaling rows
+`tp4-overlay-prefill-{8k,16k,32k,64k}` = 4,894±10 / 4,712 / 4,556 / 4,304 tok/s cold prefill;
+decode cold 75.0 C1 / 220.7 C8, primed-8K 73.3 C1 / 193.6 C8. With the operator engine-flag
+set (`overlay.yml`'s LM-head/MTP/overlap/fastpath block, `tp4-overlay-flags7-*`): prefill
+neutral (4,886±46), primed C8 **+8.4%** (209.8±19.5), C1 cells acceptance-dominated
+(cold 57.1±9.8 — random-token probe, wide CI, not a proven regression). Stock-base
+comparison cells: [`../COMPARISON.md`](../COMPARISON.md) (`tp4-stock-karmic-*`: 3,639 cold
+8K prefill, stronger primed-context decode).
 
 ## KV dtype decision (FP8 vs BF16 — deliberate, not default)
 
