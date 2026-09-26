@@ -4,14 +4,51 @@
   "topology": {
     "type": "vllm-multiprocessing-tp4",
     "hosts": [
-      {"host": "maxwell", "rank": 0, "role": "coordinator", "fabric_ip": "10.200.0.12", "secondary_ip": "10.200.1.12"},
-      {"host": "ampere", "rank": 1, "role": "headless_worker", "fabric_ip": "10.200.0.14", "secondary_ip": "10.200.1.14"},
-      {"host": "faraday", "rank": 2, "role": "headless_worker", "fabric_ip": "10.200.0.11", "secondary_ip": "10.200.1.11"},
-      {"host": "hertz", "rank": 3, "role": "headless_worker", "fabric_ip": "10.200.0.13", "secondary_ip": "10.200.1.13"}
+      {
+        "host": "maxwell",
+        "rank": 0,
+        "role": "coordinator",
+        "fabric_ip": "10.200.0.12",
+        "secondary_ip": "10.200.1.12"
+      },
+      {
+        "host": "ampere",
+        "rank": 1,
+        "role": "headless_worker",
+        "fabric_ip": "10.200.0.14",
+        "secondary_ip": "10.200.1.14"
+      },
+      {
+        "host": "faraday",
+        "rank": 2,
+        "role": "headless_worker",
+        "fabric_ip": "10.200.0.11",
+        "secondary_ip": "10.200.1.11"
+      },
+      {
+        "host": "hertz",
+        "rank": 3,
+        "role": "headless_worker",
+        "fabric_ip": "10.200.0.13",
+        "secondary_ip": "10.200.1.13"
+      }
     ],
-    "rendezvous": {"master_addr": "10.200.0.12", "master_port": 29507},
-    "start_order": [1, 2, 3, 0],
-    "stop_order": [0, 1, 2, 3],
+    "rendezvous": {
+      "master_addr": "10.200.0.12",
+      "master_port": 29507
+    },
+    "start_order": [
+      1,
+      2,
+      3,
+      0
+    ],
+    "stop_order": [
+      0,
+      1,
+      2,
+      3
+    ],
     "endpoint": "http://maxwell:8000/v1"
   },
   "platform": {
@@ -30,11 +67,23 @@
         "docker image inspect -f '{{.Id}}' equal on all four hosts",
         "docker run --rm --entrypoint cat <image> /workspace/b12x-source-commit (record sha)"
       ],
-      "contents": "vLLM local-inference-lab/vllm@dev/karmic-kraken + local-inference-lab/b12x@master, torch 2.13.0, CUTLASS DSL 4.7.0"
+      "contents": "vLLM local-inference-lab/vllm@dev/karmic-kraken + local-inference-lab/b12x@master, torch 2.13.0, CUTLASS DSL 4.7.0",
+      "observed_image_id": "sha256:64d4c3e03dbd76bb4fd00f99bce3dcdfbc3d7110d6823a88c4aaf6456e6fe368",
+      "observed_on_all_hosts": "2026-09-25"
     },
     "campaign_overlay_alternatives": [
-      {"tag": "spark-vllm:qwen38-padding-76061de4-b12x72baebbd-sm121-image-r1", "id": "sha256:a2fbec2f2e348631fad52413c61a1f72ed4df62c6d31c13b5cd6aa90a3540f7c", "kv": "bfloat16@28GiB or fp8_e4m3@42GiB", "build": "see build/README.md Path B"},
-      {"tag": "spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1", "id": "sha256:953b00ee516cac5f295bfb26863d3cfdcb5f950a6461bed76e11a84281468346", "kv": "fp8_e4m3@42GiB", "build": "see build/README.md Path B"}
+      {
+        "tag": "spark-vllm:qwen38-padding-76061de4-b12x72baebbd-sm121-image-r1",
+        "id": "sha256:a2fbec2f2e348631fad52413c61a1f72ed4df62c6d31c13b5cd6aa90a3540f7c",
+        "kv": "bfloat16@28GiB or fp8_e4m3@42GiB",
+        "build": "see build/README.md Path B"
+      },
+      {
+        "tag": "spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1",
+        "id": "sha256:953b00ee516cac5f295bfb26863d3cfdcb5f950a6461bed76e11a84281468346",
+        "kv": "fp8_e4m3@42GiB",
+        "build": "see build/README.md Path B"
+      }
     ]
   },
   "model": {
@@ -43,26 +92,64 @@
     "export_template": "local-inference-lab/Qwen3.8-Flash-Next-NVFP4@ada4da32a583a78aa47299f45a70603c950490b8",
     "export_manifest_sha256": "8a0b93599e3edb4ab25357e8af16cf1ac2c6a61354fcec9d6aa50ee9fbf94397",
     "config_override_sha256": "33d4220bd93677d0f566a93f53ee91e86970240d9c904a39faeb881946f08079",
-    "config_override_delta": {"index_share_for_mtp_iteration": false},
+    "config_override_delta": {
+      "index_share_for_mtp_iteration": false
+    },
     "weights_in_image": false,
-    "mount": {"source": "MODEL_PATH", "target": "/model", "read_only": true},
-    "served_model_names": ["Qwen3.8-Flash-Next", "qwen38-flash-next-nvfp4"]
+    "mount": {
+      "source": "MODEL_PATH",
+      "target": "/model",
+      "read_only": true
+    },
+    "served_model_names": [
+      "Qwen3.8-Flash-Next",
+      "qwen38-flash-next-nvfp4"
+    ]
   },
   "runtime": {
-    "tensor_parallel_size": 4, "pipeline_parallel_size": 1, "nnodes": 4,
-    "executor": "mp", "load_format": "instanttensor",
-    "dtype": "bfloat16", "quantization": "modelopt_mixed",
-    "max_model_len": 262144, "max_num_seqs": 16, "max_num_batched_tokens": 8192,
-    "block_size": 16, "kv_cache_dtype": "fp8_e4m3", "kv_cache_bytes_per_rank": 45097156608,
-    "gpu_memory_utilization": 0.80,
+    "tensor_parallel_size": 4,
+    "pipeline_parallel_size": 1,
+    "nnodes": 4,
+    "executor": "mp",
+    "load_format": "instanttensor",
+    "dtype": "bfloat16",
+    "quantization": "modelopt_mixed",
+    "max_model_len": 262144,
+    "max_num_seqs": 16,
+    "max_num_batched_tokens": 8192,
+    "block_size": 16,
+    "kv_cache_dtype": "fp8_e4m3",
+    "kv_cache_bytes_per_rank": 45097156608,
+    "gpu_memory_utilization": 0.8,
     "mtp_speculative_tokens": 3,
     "hc_tp_shard": true,
     "attention": "auto via b12x/QSA config (stock); campaign stack passed --attention-backend B12X explicitly",
-    "moe_backend": "b12x", "linear_backends": "b12x", "gdn_decode_kernel": "b12x",
-    "prefix_caching": true, "chunked_prefill": true, "async_scheduling": true,
-    "roce_allreduce": {"enabled": true, "allreduce_max": "2MB", "allgather_max": "16MB"},
-    "cache_namespaces": ["vllm", "triton", "flashinfer", "b12x"],
-    "files": ["serve.sh", "compose.yml", "maxwell.env", "ampere.env", "faraday.env", "hertz.env", "config.json"]
+    "moe_backend": "b12x",
+    "linear_backends": "b12x",
+    "gdn_decode_kernel": "b12x",
+    "prefix_caching": true,
+    "chunked_prefill": true,
+    "async_scheduling": true,
+    "roce_allreduce": {
+      "enabled": true,
+      "allreduce_max": "2MB",
+      "allgather_max": "16MB"
+    },
+    "cache_namespaces": [
+      "vllm",
+      "triton",
+      "flashinfer",
+      "b12x"
+    ],
+    "files": [
+      "serve.sh",
+      "compose.yml",
+      "maxwell.env",
+      "ampere.env",
+      "faraday.env",
+      "hertz.env",
+      "config.json"
+    ]
   },
   "gates": {
     "readiness": "rank0 log 'Application startup complete' (timeout 3600s)",

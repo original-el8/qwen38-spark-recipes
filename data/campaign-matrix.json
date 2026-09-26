@@ -1,0 +1,242 @@
+{
+  "schema": "qwen38-campaign-variants/1",
+  "assembled": "2026-09-25",
+  "provenance_note": "Verbatim campaign values. Raw benchmark-results run dirs for most qwen38-* studies were pruned from the fleet by 2026-09-25; every number here survives through tp4/promotion-evidence.md, tp4/qsa-selection-evidence.md, surviving deployments/*/profile.json verdict records on maxwell, or the two surviving raw HC component JSONs (qwen38-hc-20260916, qwen38-hc-striping-20260916). Rows cross-indexed into results.jsonl where serving-level.",
+  "variants": [
+    {
+      "id": "tp4-moe-tile32-mtp3-bf16-control",
+      "run_dir": "qwen38-moe-padding-20260917 (raw dir pruned fleet-wide; rows transcribed to data/results.jsonl from its README.md)",
+      "kind": "baseline",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s), mean (± sample stdev where recorded), 3 repeats",
+        "prefill_8k_tokens_per_s": 4276.3, "prefill_8k_stdev": 92.4,
+        "prefill_64k_tokens_per_s": 3994.2,
+        "prefill_128k_tokens_per_s": 3553.1,
+        "decode_ctx0_c1_tokens_per_s": 79.4,
+        "decode_ctx0_c8_tokens_per_s": 322.2,
+        "image": "spark-vllm:qwen38-moe-d320ffd5-b12x72baebbd-sm121-image-r1 sha256:2f28338d… (swapped FC1 token tile 32 + native E4M3 scale decoding)",
+        "notes": "Pre-padding tile32 MoE control; lost every cell to native-160 (-3.42/-4.92/-3.71% prefill, -7.75/-6.64% decode per the A/B rows)."
+      }
+    },
+    {
+      "id": "tp4-moe-native160-mtp3-bf16-kv28gib",
+      "run_dir": "qwen38-moe-padding-20260917 / deployments qwen38-moe-native160-mtp3-20260917 (raw dir pruned; values via data/results.jsonl + tp4/promotion-evidence.md)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s), mean ± sample stdev, 3 repeats",
+        "prefill_8k_tokens_per_s": "4422.6 ± 38.8",
+        "prefill_64k_tokens_per_s": "4190.5 ± 17.1",
+        "prefill_128k_tokens_per_s": "3684.8 ± 7.6",
+        "decode_ctx0_c1_tokens_per_s": "85.6 ± 7.4",
+        "decode_ctx0_c8_tokens_per_s": "343.6 ± 7.2",
+        "decode_ctx8k_c1_tokens_per_s": "83.2 ± 2.8",
+        "decode_ctx8k_c8_tokens_per_s": "329.0 ± 7.6",
+        "kv_capacity_tokens": 2024110,
+        "image": "spark-vllm:qwen38-padding-76061de4-b12x72baebbd-sm121-image-r1 sha256:a2fbec2f2e348631fad52413c61a1f72ed4df62c6d31c13b5cd6aa90a3540f7c",
+        "notes": "MoE native-160 padding wins every cell vs tile32: +3.42% 8K / +4.92% 64K / +3.71% 128K prefill, +7.75% C1 / +6.64% C8 cold decode — became the retained BF16 baseline."
+      }
+    },
+    {
+      "id": "tp4-hc-weight-sharding-screen",
+      "run_dir": "qwen38-hc-20260916 (survives on maxwell; weight-sharding-rank0.json read directly)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "microseconds per operation, median (no tok/s in this component screen)",
+        "rows4_medians_us": {"replicated_blas": [65.059, 63.864, 63.890], "sharded_cute_with_roce": [71.630, 69.861, 70.665], "sharded_cute_compute_only": [24.608, 25.506, 28.180]},
+        "rows32_medians_us": {"replicated_blas": [67.453, 66.864, 68.075], "sharded_cute_with_roce": [270.950, 255.974, 254.356]},
+        "notes": "Synthetic cold-weight screen ('no serving speedup claim'): sharded CuTe+RoCE slower than replicated BLAS (rows=32 simt1 median 270.95µs vs 67.45µs); compute-only 24.6-28.2µs shows comms dominate — HC TP-shard ships only at TP4 for memory (HC_TP=1); TP2 must run replicated/off."
+      }
+    },
+    {
+      "id": "tp4-hc-striping-reduce-scatter-screen",
+      "run_dir": "qwen38-hc-striping-20260916 (survives on maxwell; rank0.json + protocol.json read directly)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "microseconds per complete HC path, eager median (no tok/s in this component study)",
+        "rows_6768_eager_median_us": {"whole": 3867.972, "pipeline2": 4929.774, "serial2": 5064.547, "pipeline4": 5676.496, "serial4": 5868.696},
+        "gate": "required >=5% lower complete-path eager latency at 7520 and 8192 rows before serving integration",
+        "notes": "Every striped arm exceeded whole at all displayed row counts (e.g. 6768 rows: whole 3868µs vs pipeline2 4930µs) — striping gate unmet; correctness still passed (max relative RMSE vs whole 0.015, min cosine 0.999)."
+      }
+    },
+    {
+      "id": "tp4-mtp-depth-sweep",
+      "run_dir": "qwen38-qsa-mtp-20260916 (raw dir pruned; arms' deployment profiles + qsa-r3/graphs variants remain on maxwell)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "no serving tok/s survived the prune; verdict record only",
+        "arms": "MTP2 / MTP3 / MTP4 on matched HC-shard+coalesce stack, compared twice (also on one immutable QSA graph-capture image)",
+        "notes": "Verdict (tp4/DETAILS.md): 'MTP3 won the depth sweep (MTP2/3/4 compared twice; 8,192-token batched budget removes the suboptimal-performance warning MTP causes at 2,048)'."
+      }
+    },
+    {
+      "id": "tp4-roce-cutoff-20k-allreduce",
+      "run_dir": "qwen38-roce-cutoff-20260916 (raw dir pruned; verdict in deployments/qwen38-roce-cutoff20k-20260916/profile.json, selected=false)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "geometric-mean throughput % (C4/C8)",
+        "cutoff_allreduce_bytes": 20480,
+        "baseline_allreduce_bytes": 2097152,
+        "allgather_max_bytes": 16777216,
+        "performance_floors_passed": true,
+        "selection_performance_passed": false,
+        "notes": "Rejected verbatim: 'The cutoff is not selected because C4/C8 geometric-mean throughput falls 5.5% instead of meeting the required 5% gain' — retained 2 MiB all-reduce / 16 MiB all-gather RoCEnante cutoffs."
+      }
+    },
+    {
+      "id": "tp2-vs-tp4-scaling",
+      "run_dir": "qwen38-tp-scaling-smem-20260917 (raw dir pruned; surviving ratio record in tp2/README.md)",
+      "kind": "ablation",
+      "tp": 2,
+      "summary": {
+        "units": "ratio of TP2 to TP4 rates (surviving measured ratios, %)",
+        "tp2_vs_tp4_prefill_pct": "~76-83",
+        "tp2_vs_tp4_decode_c1_pct": "~70",
+        "notes": "Verbatim: 'Prefill is ~76-83% of tp4 rate and decode ~70% of tp4 C1 — the second NIC pair is not the bottleneck; cross-rank collectives per layer are' — TP4 retained as flagship, TP2 ships to free faraday+hertz."
+      }
+    },
+    {
+      "id": "tp4-recurrent-checkpoint-policy",
+      "run_dir": "qwen38-recurrent-policy-20260917 (raw dir pruned; arms' profiles remain: checkpoint-boundaries/periodic, retention2848/5696/7120)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "no serving tok/s survived the prune; policy records only",
+        "request_boundaries_arm": "recurrent_checkpoint_policy=request_boundaries, research-only, baseline_promoted=false (deployments/qwen38-checkpoint-boundaries-20260917)",
+        "retained_policy": "aligned recurrent checkpoints and retention interval zero (final TP4/TP2 config, qsa-selection-evidence.md serving controls)",
+        "notes": "No recurrent-policy ablation promoted; shipped config keeps aligned checkpoints + retention interval 0 with async scheduling."
+      }
+    },
+    {
+      "id": "tp4-fp8-kv42-promotion-day",
+      "run_dir": "qwen38-fp8-promotion-20260917 (dir pruned; its README survives verbatim as tp4/promotion-evidence.md)",
+      "kind": "baseline",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s), mean ± sample stdev, 3 repeats; deltas vs same-day native-160 BF16/28 GiB",
+        "prefill_8k_tokens_per_s": "3319.7 ± 634.5", "delta_prefill_8k_pct": -24.94,
+        "prefill_64k_tokens_per_s": "3856.1 ± 497.4", "delta_prefill_64k_pct": -7.98,
+        "prefill_128k_tokens_per_s": "2713.4 ± 202.0", "delta_prefill_128k_pct": -26.36,
+        "decode_ctx0_c1_tokens_per_s": "66.5 ± 14.2", "delta_decode_ctx0_c1_pct": -22.37,
+        "decode_ctx0_c8_tokens_per_s": "330.3 ± 5.3", "delta_decode_ctx0_c8_pct": -3.88,
+        "decode_ctx8k_c1_tokens_per_s": "70.1 ± 11.7", "delta_decode_ctx8k_c1_pct": -15.81,
+        "decode_ctx8k_c8_tokens_per_s": "252.0 ± 42.2", "delta_decode_ctx8k_c8_pct": -23.41,
+        "kv_capacity_tokens": 5486463,
+        "capacity_ratio_vs_bf16": "2.71x (5,486,463 vs 2,024,110 tokens)",
+        "kernel_config_divergence": "91 of 182 common query configurations re-tuned under FP8 namespaces",
+        "notes": "FP8/42 GiB promoted by explicit operator choice at -24.94/-7.98/-26.36% prefill and -22.37/-3.88/-15.81/-23.41% decode vs BF16 for 2.71x KV capacity; promotion-day variance never attributed (see steady-state row)."
+      }
+    },
+    {
+      "id": "tp4-fp8-kv42-steady-state-control",
+      "run_dir": "qwen38-qsa-selection-20260917 retained-baseline column (frozen qwen38-checkpoint-spacing-20260917/baseline-return-performance control)",
+      "kind": "baseline",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s), 3 repeats; deltas vs native-160 BF16 row",
+        "prefill_8k_tokens_per_s": 4415.1, "delta_vs_bf16_pct": -0.03,
+        "prefill_64k_tokens_per_s": 4183.6, "delta_vs_bf16_pct_64k": 2.1,
+        "prefill_128k_tokens_per_s": 3688.4, "delta_vs_bf16_pct_128k": 4.1,
+        "decode_ctx0_c1_tokens_per_s": 77.3, "delta_vs_bf16_pct_c1": -4.3,
+        "decode_ctx0_c8_tokens_per_s": 331.6, "delta_vs_bf16_pct_c8": -2.2,
+        "decode_ctx8k_c1_tokens_per_s": 75.8,
+        "decode_ctx8k_c8_tokens_per_s": 318.2,
+        "notes": "Steady-state FP8-KV42 = BF16 parity-to-faster at long context (-0.03/+2.1/+4.1% prefill) at 2.71x KV capacity — this is the arm representative of FP8, not the promotion-day run."
+      }
+    },
+    {
+      "id": "tp4-fp8-kv-mtp3-lavd-quality",
+      "run_dir": "qwen38-fp8-lavd-20260917 (dir pruned; counts preserved verbatim in promotion README 'Known quality limits' + root honesty box)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "LAVD long-reasoning case counts (not tok/s)",
+        "cases_total": 20, "exact": 16, "near": 3,
+        "loop": "one repeated-word loop ending in a client timeout",
+        "notes": "Quality caveat on the selected FP8 config: 16 exact / 3 near / 1 loop in 20 long-reasoning cases; cause unresolved — FP8 promoted only with this disclosure."
+      }
+    },
+    {
+      "id": "tp4-fp8-kv-mtp0-lavd-quality",
+      "run_dir": "qwen38-fp8-mtp0-lavd-20260917 (dir pruned; counts preserved in promotion README)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "LAVD case counts (not tok/s)",
+        "cases_total": 8, "exact": 7, "near": 1, "loop": 0,
+        "notes": "FP8 with MTP disabled: 'seven exact and one near answer without a loop in eight requests'; tuning/scheduling differences prevent attribution to MTP — no tok/s comparison possible."
+      }
+    },
+    {
+      "id": "tp4-fp8-kv-numerical-correctness",
+      "run_dir": "qwen38-fp8-kv-correctness-20260917 (dir pruned; verdict preserved in promotion README)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "qualitative (no tok/s or pass counts beyond text survived)",
+        "notes": "Verbatim: 'Several numerical comparisons are inconclusive because the BF16 references are themselves unstable.'"
+      }
+    },
+    {
+      "id": "tp4-qsa-candidate-initial-slowdown",
+      "run_dir": "qwen38-qsa-selection-20260917 (stopped initial matrix; table survives in tp4/qsa-selection-evidence.md + results.jsonl)",
+      "kind": "ablation",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s); repeat counts as recorded, cell excluded from verdict",
+        "prefill_8k_tokens_per_s": "2927.0 (2 samples)",
+        "prefill_64k_tokens_per_s": "3135.9 (2 samples)",
+        "prefill_128k_tokens_per_s": "3192.5 (2 samples)",
+        "decode_ctx0_c1_tokens_per_s": "63.0 (2 samples)",
+        "decode_ctx0_c8_tokens_per_s": "235.9 (2 samples)",
+        "decode_ctx8k_c1_tokens_per_s": "59.5 (2 samples)",
+        "decode_ctx8k_c8_tokens_per_s": "260.9 (1 sample)",
+        "notes": "Early-stopped coordinator slowdown arm (~286µs vs ~139µs per unchanged MoE microkernel on maxwell); cleared on identical restart — the campaign's 're-run before trusting a slow first arm' rule."
+      }
+    },
+    {
+      "id": "tp4-final-qsa-selection-restart",
+      "run_dir": "qwen38-qsa-selection-20260917 candidate-tp4 (image sha256:953b00ee…; table survives verbatim in tp4/qsa-selection-evidence.md)",
+      "kind": "final",
+      "tp": 4,
+      "summary": {
+        "units": "tokens per second (tok/s), 3 repeats each; deltas vs retained FP8 baseline row",
+        "prefill_8k_tokens_per_s": 4421.5, "delta_vs_baseline_pct": 0.1,
+        "prefill_64k_tokens_per_s": 4276.9, "delta_vs_baseline_pct_64k": 2.2,
+        "prefill_128k_tokens_per_s": 3834.5, "delta_vs_baseline_pct_128k": 4.0,
+        "decode_ctx0_c1_tokens_per_s": 81.9, "delta_vs_baseline_pct_c1": 6.0, "mtp_acceptance": 0.535,
+        "decode_ctx0_c8_tokens_per_s": 336.2, "delta_vs_baseline_pct_c8": 1.4,
+        "decode_ctx8k_c1_tokens_per_s": 82.2, "delta_vs_baseline_pct_c1_8k": 8.4, "mtp_acceptance_ctx8k": 0.548,
+        "decode_ctx8k_c8_tokens_per_s": 327.9, "delta_vs_baseline_pct_c8_8k": 3.0,
+        "acceptance_shift": "49.0%→53.5% (ctx0) and 48.2%→54.8% (8K); approximate step rates only +0.4%/+0.3% — decode gains not credited to the patch",
+        "component_latency_reduction_pct_tp4": [2.36, 2.76, 3.27, 8.86, 10.76],
+        "checks": "26/26 long shared-prefix/history-edit; zero preemptions; min MemAvailable 16.05 GiB (maxwell)",
+        "notes": "Selected serving config: FP8-KV42 + MTP3 + HC shard at TP4; QSA fusion is a modest +0.1/+2.2/+4.0% long-context prefill win, research-only (baseline unchanged)."
+      }
+    },
+    {
+      "id": "tp2-final-qsa-selection",
+      "run_dir": "qwen38-qsa-selection-tp2-20260917 (maxwell+ampere; table survives in tp4/qsa-selection-evidence.md TP2 column)",
+      "kind": "final",
+      "tp": 2,
+      "summary": {
+        "units": "tokens per second (tok/s), 3 repeats",
+        "prefill_8k_tokens_per_s": 3349.9,
+        "prefill_64k_tokens_per_s": 3058.2,
+        "prefill_128k_tokens_per_s": 2828.7,
+        "decode_ctx0_c1_tokens_per_s": 58.2,
+        "decode_ctx0_c8_tokens_per_s": 231.9,
+        "decode_ctx8k_c1_tokens_per_s": 55.8,
+        "decode_ctx8k_c8_tokens_per_s": 226.6,
+        "kv_capacity_tokens": 1918359,
+        "checks": "26/26 exact shared-prefix/history-edit; min MemAvailable 22.27 GiB (maxwell) / 25.25 GiB (ampere); replicated HC, FP8 KV 16 GiB/rank",
+        "notes": "TP2 ships as secondary recipe: same image/FP8/MTP3, ~76-83% of TP4 prefill and ~71% of TP4 C1 decode — trades speed for freeing faraday+hertz."
+      }
+    }
+  ]
+}

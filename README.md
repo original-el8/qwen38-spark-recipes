@@ -119,9 +119,10 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 ## Known quality limits (honesty box)
 
 - FP8 KV + MTP3 showed one repeated-word loop ending in client timeout in a 20-case LAVD run
-  (16 exact / 3 near / 1 loop); FP8 + MTP-off was clean in 8/8, but tuning and scheduling
-  differences prevent attribution. FP8 KV was promoted **by explicit operator choice** after
-  that disclosure, trading some throughput and unresolved tail quality for 2.7× KV capacity.
+  (16 exact / 3 near / 1 loop); FP8 + MTP-off returned 7 exact + 1 near with no loop in 8
+  requests, but tuning and scheduling differences prevent attribution. FP8 KV was promoted
+  **by explicit operator choice** after that disclosure: parity-to-faster long-context
+  prefill and 2.71× KV capacity, at a ~4% single-stream decode cost and the unresolved loop.
   BF16-KV cells remain available in [`data/results.jsonl`](data/results.jsonl).
 - A one-off TP4 startup slowdown (2× MoE-kernel latency on the coordinator only, same graph,
   same clocks) was seen once and cleared on restart without any change; cause unresolved.

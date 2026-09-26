@@ -74,12 +74,14 @@ Measured head-to-head, same campaign, same hardware (`data/results.jsonl`):
 | prefill 128K | 3,684.8 | 3,834.5 | **+4.1%** |
 | decode C1 cold | 85.6 | 81.9 | −4.3% |
 | decode C8 cold | 343.6 | 336.2 | −2.2% |
-| KV capacity/rank | ≈2.02M tok | 5,486,463 tok | **≈2.71×** |
+| KV capacity/rank | 2,024,110 tok | 5,486,463 tok | **2.71×** |
 
 Two honest asterisks: (a) the promotion-day FP8 arm measured far slower (3,319 / 3,856 / 2,713;
 rows `tp4-fp8-kv42-*`) with unexplained variance never attributed — only the later
 steady-state arm above is representative; (b) FP8 KV carries the open LAVD quality issue
-(1 repeated-word loop + client timeout in 20 long-reasoning cases; 8/8 clean at MTP-off).
+(1 repeated-word loop + client timeout in 20 long-reasoning cases; MTP-off returned 7 exact +
+1 near with no loop in 8 requests, unattributable).
+
 **Decision: FP8 stays the published default** — parity-to-faster throughput at long context,
 2.71× concurrency headroom — with the loop risk disclosed; switch to the BF16 variant
 (pitfall 7) for long-reasoning-heavy or single-stream-latency-critical traffic.
@@ -107,7 +109,7 @@ all ranks healthy with matching image ID after each matrix. Full text:
    fallback profile if your workload is long-reasoning-heavy.
 7. BF16-KV alternative: with `KV_CACHE_MEMORY_BYTES=30064771072` and no `--kv-cache-dtype`
    override the same files reproduce the faster 28 GiB BF16 baseline (4,422.6 / 4,190.5 /
-   3,684.8 prefill; 85.6 C1) at 2.02M-token capacity — set
+   3,684.8 prefill; 85.6 C1) at 2,024,110-token capacity — set
    `LOAD_FORMAT=instanttensor`, drop `kv_cache_dtype`, keep everything else.
 
 See `DETAILS.md` for every flag and env var with its why.
