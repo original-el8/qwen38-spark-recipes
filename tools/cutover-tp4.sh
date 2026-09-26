@@ -30,6 +30,12 @@ for h in ampere faraday hertz; do
   [ "$pid" = "$ID" ] || { echo "ABORT: $h image mismatch/missing"; exit 1; }
 done
 
+echo "== staging check: deployment files present on all ranks"
+for r in 0 1 2 3; do h=$(host_of $r)
+  ssh $h "test -x $QDIR/serve.sh && test -f $QDIR/compose.yml && test -f $QDIR/$h.env && test -f $QDIR/config.json" \
+    || { echo "ABORT: $h missing deployment files in $QDIR"; exit 1; }
+done
+
 echo "== stop DS4.1 (coordinator 0 first, then workers)"
 for r in 0 1 2 3; do h=$(host_of $r)
   ssh $h "cd $DSROOT && docker compose -f compose.json --env-file $h.env -p $DS down --timeout 30" || echo "warn: ds41 down r$r on $h failed/absent"
