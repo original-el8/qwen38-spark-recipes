@@ -27,21 +27,27 @@ def completions(prompt_ids, max_tokens=64, temperature=0.0):
 def metrics():
     with urllib.request.urlopen(f"{BASE}/metrics", timeout=30) as r:
         body = r.read().decode()
-    out = {}
+    out = {"preemptions": 0.0, "pq": 0.0, "ph": 0.0}
+    # exact `_total{` match: Prometheus `_created` companions carry wall-clock
+    # timestamps that would otherwise clobber the real counter values
+    want = {"vllm:num_preemptions_total{": "preemptions",
+            "vllm:prefix_cache_queries_total{": "pq",
+            "vllm:prefix_cache_hits_total{": "ph"}
     for line in body.splitlines():
-        if line.startswith("vllm:num_preemptions"):
-            out["preemptions"] = float(line.split()[-1])
-        if line.startswith("vllm:prefix_cache_queries"):
-            out["pq"] = float(line.split()[-1])
-        if line.startswith("vllm:prefix_cache_hits"):
-            out["ph"] = float(line.split()[-1])
+        for pref, key in want.items():
+            if line.startswith(pref):
+                out[key] = float(line.split()[-1])
     return out
 
+import time
+_NONCE = time.time_ns() % 100000  # prefix is COLD on every run (no cache-reset endpoint)
+
 def ids(n, salt=0):
-    return [( (i+salt) * 2654435761 ) % 150000 + 1000 for i in range(n)]
+    return [((i + salt + _NONCE) * 2654435761) % 150000 + 1000 for i in range(n)]
 
 def cell(prefix_len, concurrency):
-    prefix = ids(prefix_len)
+    prefix = ids(prefix_len)  # same prefix across the C requests of this run (shared),
+    # but never seen before thanks to _NONCE -> the window contains the real cold prefill
     def one(i):
         r = completions(prefix + ids(32, salt=i + 1), max_tokens=64)
         fr = r["choices"][0].get("finish_reason")
