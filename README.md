@@ -29,3 +29,19 @@ Single-variable, identity-gated, labeled clean.
 
 The clanker was dumb. The clanker's learned.
 We'll be back soon with data earned.
+
+---
+
+## The return: 2026-09-26
+
+Every row in `data/results.jsonl` this time carries: serving identity (image digest answering the port), fleet-wide code-tree content hash, regime (cold/warm), single-variable flags, and — for the speculative cells — a correctness certificate (temp-0 argmax-exactness via logprobs top-k, 128/128 on all three configs).
+
+Headline, measured and certified:
+
+- MTP speculative serving = **1.6–1.8x** over the non-spec reference (90–103 vs 56.6 tok/s, C1 temp-0).
+- The lever is **merge quality**: a true three-way merge onto current nightly (6 clean merges, 1 conflict resolved on kernel-fusion evidence) lifts acceptance from 1.84 to 2.4–2.85. Fuzz-applied patches had been silently reverting nightly's fused checkpoint path.
+- `draft_sample_method="probabilistic"`: irrelevant at temp-0, **+42% at temp-1** (82.4 vs 57.8) — it reproduces the upstream author's high-80s cell and explains it.
+- Coalesce: neutral. `HC_PREFILL_MODE`: a dead flag in every image that ever shipped it. The withdrawn 4,354 prefill row fails replication; it stays withdrawn.
+- Byte-exact temp-0 determinism does not exist on this fork under continuous batching; the repo's correctness oracle is argmax-logprob exactness, with any cross-config text diff judged against the same-engine drift band (2–373 chars).
+
+Reproduce: `recipes/RECIPE.md` (build + flags + protocol). Cycles: `tools/ldb-fast-matrix.sh` (now with cross-rank content-divergence gate baked in).

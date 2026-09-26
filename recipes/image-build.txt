@@ -1,0 +1,18 @@
+FROM eugr/spark-vllm-b12x:nightly-20260925
+COPY tree2/vllm /usr/local/lib/python3.12/dist-packages/vllm
+COPY ple5/__init__.py ple5/_kernels.py ple5/_preparation.py ple5/api.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple/
+COPY verify6.py /tmp/verify6.py
+RUN find /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name "__pycache__" -exec rm -rf {} + ; rm -rf /usr/local/lib/python3.12/dist-packages/vllm/__pycache__ ; python3 /tmp/verify6.py
+===VERIFY===
+from b12x.sequence.ple import api, _preparation
+assert hasattr(api, 'export_checkpoint')
+assert 'export_checkpoint' in dir(_preparation._PleState)
+import vllm, vllm.envs as E
+assert [k for k in dir(E) if 'HC_PREFILL' in k]
+import vllm.models.qwen4_exp.common.hc_prefill
+import vllm.models.qwen4_exp.nvidia.ple_layer, vllm.models.qwen4_exp.nvidia.ple_attn
+import vllm.v1.core.sched.scheduler
+import inspect
+assert 'autotune=' not in inspect.getsource(vllm.models.qwen4_exp.nvidia.ple_layer)
+print('R6-GAUNTLET-OK')
+===TREE2 (true three-way merge)==
