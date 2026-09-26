@@ -44,10 +44,20 @@ fi
 
 speculative_args=()
 if [[ "${MTP_TOKENS:-3}" != 0 ]]; then
+  # MTP_BACKENDS_IN_SPEC=1: give the DRAFT path the same b12x backends as the target
+  # (sparkring author's profile does this; plain mtp:3 shorthand leaves the drafter on
+  # generic kernels -> draft logits disagree with the b12x verifier -> low acceptance).
+  if [[ "${MTP_BACKENDS_IN_SPEC:-0}" == "1" ]]; then
+    speculative_args=(
+      --speculative-config
+      "{\"method\":\"mtp\",\"num_speculative_tokens\":${MTP_TOKENS},\"moe_backend\":\"b12x\",\"attention_backend\":\"B12X\"}"
+    )
+  else
   speculative_args=(
     --speculative-config
     "{\"method\":\"mtp\",\"num_speculative_tokens\":${MTP_TOKENS}}"
   )
+  fi
 fi
 
 variant_args=()
