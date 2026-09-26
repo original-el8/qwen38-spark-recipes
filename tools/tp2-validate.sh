@@ -22,7 +22,8 @@ restore_tp4(){
   sleep 5
   ssh maxwell "cd $Q4 && docker compose --env-file maxwell.env -p $QP up -d" || { echo "CRITICAL: tp4 coordinator up failed"; return 1; }
   for i in $(seq 1 110); do
-    ssh maxwell "docker logs $QP-0 2>&1 | grep -q 'Application startup complete'" && { echo TP4-RESTORED-READY; return 0; }
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://maxwell:8000/v1/models || echo 000)
+    [ "$code" = 200 ] && { echo TP4-RESTORED-READY; return 0; }
     sleep 30
   done
   echo "CRITICAL: TP4 restore readiness cap hit"; return 1
@@ -41,7 +42,9 @@ ssh maxwell "cd $Q2 && docker compose --env-file maxwell.env -p $T2 up -d" || { 
 echo "== wait TP2 readiness"
 READY=0
 for i in $(seq 1 110); do
-  ssh maxwell "docker logs $T2-0 2>&1 | grep -q 'Application startup complete'" && { READY=1; break; }
+  # live API readiness (stale logs from prior runs of the same container never lie)
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://maxwell:8000/v1/models || echo 000)
+  [ "$code" = 200 ] && { READY=1; break; }
   ssh maxwell "docker inspect -f '{{.State.Running}}' $T2-0" 2>/dev/null | grep -q true || { echo "FAIL: tp2 rank0 exited"; ssh maxwell "docker logs --tail 40 $T2-0"; restore_tp4; exit 1; }
   sleep 30
 done
