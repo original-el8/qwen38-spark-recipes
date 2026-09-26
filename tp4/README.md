@@ -15,7 +15,7 @@ backends inside `--speculative-config`, applied by `serve.sh`). No overlay, no l
 |---|---|---|
 | prefill cold 8K / 16K / 128K | ~4,4 / **4,704** / 3,825 tok/s | 3,3–3,4xx (−23%) |
 | decode C1 cold | 57.3–60.9 tok/s (steps/s 31.0–31.7) | **64.8 tok/s** ctx0 (steps/s 37.0, +18%) |
-| vs author r37 reference | prefill +24…+39%; realistic-prompt decode parity | prefill ≈author; decode lead |
+| vs author r37 reference | prefill +24…+39%; realistic-prompt decode parity on historical-image evidence (current-config cell pending) | prefill ≈author; decode lead |
 | qualification | shipped default | EXPERIMENTAL (mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits) |
 
 Row IDs + full matrices: [`../data/results.jsonl`](../data/results.jsonl)

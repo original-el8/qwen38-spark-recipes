@@ -10,7 +10,8 @@ Results (full tables + row IDs in `data/results.jsonl`):
 - decode-max profile (`tp4/overlay.decode-max.yml`, public wheel rebuild): C1 64.8 tok/s
   (steps/s +18%), prefill −23%, EXPERIMENTAL (mainline b12x lacks eugr's fork patches).
 - vs the Fujitsu sparkring r37 reference (same model/hardware): prefill +24…+39%,
-  realistic-prompt decode parity, C8 lead (image-labelled). The famous "author gap" was a
+  realistic-prompt decode parity on historical-image evidence (current-config cell
+  `tp4-bq-promoted-*` pending), C8 lead (image-labelled). The famous "author gap" was a
   warm-window-vs-cold-wall metric artifact — see `SPARKRING.md` before repeating it.
 
 Read order:
