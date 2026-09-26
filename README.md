@@ -16,10 +16,10 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925` (public Docker Hub) + recipe defau
 
 | cell | value | method / rows |
 |---|---:|---|
-| prefill 8K / 16K / 32K / 64K / 128K (tok/s, cold) | 4,35x–4,4 / up to **4,704** / 4,437 / 4,25x / 3,825 | llm_decode_bench fast matrix, `tp4-ldb-block32-*`, `tp4-ldb-promoted-*` |
-| decode C1 cold (tok/s, ctx0 / 64K) | **57.3–60.9** | same, `tp4-ldb-*` decode rows; MTP-normalized steps/s 31.0–31.7, accept 1.8–1.9 |
-| decode C1 realistic prompts (tok/s) | 75.9±24.9 measured on stock `64d4c3e0`; current-config cell `tp4-bq-promoted-*` pending | `tools/bench-quick.py` matched probe |
-| decode C8 (tok/s, ctx0) | 336.2 (campaign image `953b00ee`); current-image cell pending | `tp4-qsa-selection-decode-ctx0-c8`, `tp4-ldb-promoted-c8` |
+| prefill 8K / 16K / 32K / 64K / 128K (tok/s, cold) | **3,558 / 3,575 / 3,435 / 3,233 / 2,841** steady state | llm_decode_bench fast matrix ×2 full repeats, near-identical: `tp4-ldb-promoted-prefill-*`. An intermittent HIGH tuning cluster (4,4–4,7xx; `tp4-ldb-block32-*`) does NOT reproduce on fresh-container state — attribution unresolved, see honesty box |
+| decode C1 cold (tok/s, ctx0 / 64K) | **63.3–64.3** | same runs, `tp4-ldb-promoted-decode-*-c1`; MTP-normalized steps/s 36.1, accept 1.75–1.83 |
+| decode C8 (tok/s, ctx0 / 64K) | **249.2 / 243.3** | `tp4-ldb-promoted-decode-*-c8`; campaign image's 336.2 was a higher-accept historical cell (`tp4-qsa-selection-decode-ctx0-c8`) |
+| decode C1 realistic prompts (tok/s) | current-config cell in flight (`--prompt-file` realistic dataset); historical: 75.9±24.9 stock, 87.5±10.7 campaign image | llm_decode_bench realistic-dataset probe |
 | KV capacity | **5,486,463 tokens** (42 GiB FP8 KV/rank ×4, effective block 1,424) | `tp4/compose.yml` budgets, verified at startup |
 | TP2 pair (maxwell-class hosts ×2) | same context; 1,918,359-token KV pool; ≥22 GiB MemAvailable kept | [`tp2/`](tp2/README.md) |
 
@@ -27,12 +27,12 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925` (public Docker Hub) + recipe defau
 
 Same base + a sha256-pinned **public** b12x mainline wheel + engine-flag envs
 ([`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml)). Buildable by anyone; see the
-overlay header for the two-step recipe.
-
+overlay header for the two-step recipe. **Status 2026-09-26: not recommended** — the stock
+default's fresh-container tuning state reached its decode tier for free.
 | cell | value | note |
 |---|---:|---|
-| decode C1 cold | **64.8 tok/s** ctx0 (58.4–60.9 range across cells) | steps/s 37.0 vs default 31.0 (**+18%**), accept 1.65–1.83 |
-| prefill | 3,3–3,4xx | −23% vs default: mainline b12x autotune drifts on this vLLM pairing |
+| decode C1 cold | 64.8 tok/s ctx0 (steps/s 37.0) | **no longer beats the default** in its tuning state: default now steps at 36.1 (was 31.0 when this profile was cut); delta ≈ +2.5% |
+| prefill | 3,3–3,4xx | ≈5% under the default's steady 3,55x — mainline b12x autotune drifts on this vLLM pairing |
 | status | smoke-passed (arithmetic, tool-calls, vision) | NOT behavior-qualified: mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits — experimental |
 
 ## Against the reference stack (Fujitsu sparkring, same model + hardware class)
@@ -42,15 +42,17 @@ comparison anchor; our earlier apparent 5–25% "gap" was a metric artifact (the
 `aggregate_decode_window_tps` warm/TTFT-excluded numbers compared against cold wall rates).
 Like-for-like (full table + reasoning: [`SPARKRING.md`](SPARKRING.md)):
 
-| cell | author r37 | this recipe | verdict |
+| cell | author r37 | this recipe (current steady state) | verdict |
 |---|---:|---:|---|
-| prefill cold 16K | 3,394–3,813 | 4,4–4,7xx | **+24…+39%** |
-| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | 87.5±10.7 (historical image); current-config pending | parity on historical evidence |
-| C8 decode | 255–259.5 warm wall | 336.2 (campaign image); current pending | lead (image-labelled) |
+| prefill cold 16K | 3,394–3,813 | **3,575** (high-cluster 4,5–4,7xx intermittent, unattributed) | parity, +0…5% (high cluster: +19…+39%) |
+| C1 decode cold wall (ctx0) | 53.5 | **63.3–64.3** (steps/s 36.1) | **+18…+20%** (their fixture carries TTFT; weak-comparable) |
+| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window | current-config cell in flight; historical: 87.5±10.7 | parity on historical evidence |
+| C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **249.2** (ctx0 cold) | big lead vs their cold wall; ≈parity vs warm wall (−3%) |
 
-Env-level levers we A/B'd against the default (one variable per run, same instrument):
-keep = block-size 32 (16K prefill +3.7%), b12x backends in speculative-config (accept
-1.82→1.89); retired = async-scheduling off, size-based dispatch overrides,
+Env-level levers A/B'd against the default (one variable per run, same instrument):
+keep = b12x backends in speculative-config (accept 1.82→1.89), block-size 32 (author's
+value; best cell +3.7% but cluster-suspect — kept as config-parity, effect unproven);
+retired = async-scheduling off, size-based dispatch overrides,
 `NCCL_CROSS_NIC=1` (all flat). Full table + the b12x pairing law (which wheels even start
 with which vLLM): [`SPARKRING.md`](SPARKRING.md).
 
@@ -118,6 +120,10 @@ with exit 137 during long prefill).
 - A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
   seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
   arm before recording it.
+- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,7xx for
+  byte-identical config+image (fresh vs campaign-era container/cache state), reproduced in
+  both directions across independent full repeats. Headline tables quote the LOW (steady,
+  two-repeat) cluster; treat high-cluster rows as upper bound pending attribution.
 - Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
   `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
   both before crediting any change.

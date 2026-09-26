@@ -13,9 +13,10 @@ backends inside `--speculative-config`, applied by `serve.sh`). No overlay, no l
 
 | | default profile | decode-max profile (optional) |
 |---|---|---|
-| prefill cold 8K / 16K / 128K | ~4,4 / **4,704** / 3,825 tok/s | 3,3–3,4xx (−23%) |
-| decode C1 cold | 57.3–60.9 tok/s (steps/s 31.0–31.7) | **64.8 tok/s** ctx0 (steps/s 37.0, +18%) |
-| vs author r37 reference | prefill +24…+39%; realistic-prompt decode parity on historical-image evidence (current-config cell pending) | prefill ≈author; decode lead |
+| prefill cold 8K / 16K / 128K | **3,558 / 3,575 / 2,841** (steady, 2 full repeats; intermittent high cluster 4,4–4,7xx unattributed) | 3,3–3,4xx (≈5% under default) |
+| decode C1 cold | **63.3–64.3** tok/s (steps/s 36.1, accept 1.75–1.83) | 64.8 tok/s ctx0 (steps/s 37.0 — no meaningful edge) |
+| decode C8 cold ctx0 | **249.2** | (not re-measured) |
+| vs author r37 reference | prefill parity +0…5%; C1 cold-wall +18…+20%; realistic-prompt parity on historical-image evidence (current cell in flight) | superseded by default |
 | qualification | shipped default | EXPERIMENTAL (mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits) |
 
 Row IDs + full matrices: [`../data/results.jsonl`](../data/results.jsonl)

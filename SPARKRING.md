@@ -17,10 +17,10 @@ distinguishes two decode metrics that our earlier campaign conflated:
 
 | cell (tok/s) | author r37 | this recipe (same methodology) | Δ |
 |---|---:|---:|---|
-| C1 decode **cold wall** | 53.5 (7.9K-token fixture; TTFT 1.80 s dominates) | **57.3–60.9** (stock+flags-off); **64.8** decode-max profile — but our `ctx0` cells are near-zero-prompt, so this row flatters us | weak-comparable |
-| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | HISTORICAL images only: 75.9±24.9 (stock `64d4c3e0`), 87.5±10.7 (campaign `953b00ee`). **Current promoted config not yet measured realistic-prompt** — `tp4-bq-promoted-*` rows land after the LDB matrix series | parity on historical evidence; current-config cell pending |
-| C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **336.2** (campaign image `953b00ee`, N=3; current-image cell: see `tp4-ldb-promoted-*`) | lead, image-labelled |
-| prefill cold 16K | 3,394 (4.828 s / 16,384 tok, QAD-TP4-PREFILL.md) · 3,647–3,813 (r37) | **4,526–4,713** | **+24…+39%** |
+| C1 decode **cold wall** | 53.5 (7.9K-token fixture; TTFT 1.80 s dominates) | **63.3–64.3** ctx0 (steady, 2 repeats; steps/s 36.1) — ctx0 flatters us slightly | **+18…+20%**, weak-comparable |
+| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | current config running the same realistic dataset through llm_decode_bench NOW (`tp4-bq-promoted-*` lands tonight); historical images: 75.9±24.9 stock, 87.5±10.7 campaign | parity on historical evidence; current cell in flight |
+| C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **249.2** ctx0 cold, steps-tier same as C1 | lead vs their cold wall; ≈parity vs warm wall (−3%) |
+| prefill cold 16K | 3,394 (4.828 s / 16,384 tok, QAD-TP4-PREFILL.md) · 3,647–3,813 (r37) | **3,575** steady (×2 repeats); high tuning cluster 4,5–4,7xx intermittent, unattributed | parity +0…5% (high cluster +19…+39%) |
 Earlier mid-2026 rows here ("author 4,853@8K, +6.6% gap"; "73–89 tok/s C1") were
 warm-window/relayed numbers — superseded by the raw JSON above. `data/results.jsonl` carries
 the authoritative author rows as `author-r37-*` (wall + window + TTFT fields preserved).
@@ -55,8 +55,10 @@ in the same nightly REQUIRES mainline-new attributes:
   prefill autotune drifts to 3,3–3,4xx (−23%) — unrescued by flags or block32.
 
 Consequence: **newer b12x is a trade, not a free win.** We ship stock nightly as default
-(prefill +24…+39% vs author) and publish `tp4/overlay.decode-max.yml` (b12x `e39b437b` +
-flag suite + block32) for decode-dominant serving. Rebuild recipe and wheel provenance are
+(prefill parity vs author; C1 cold wall +18…+20%) and publish
+`tp4/overlay.decode-max.yml` (b12x `e39b437b` + flag suite + block32) — superseded 2026-09-26
+(the default's fresh-container tuning state hit 36.1 steps/s vs the overlay's 37.0; overlay
+no longer justified). Rebuild recipe and wheel provenance are
 in that overlay's header. Author's claimed patched-NCCL (+5–6.8% prefill) and SparkCache
 (TTFT restore) remain their engine-bound stack — neither is needed for parity, which is
 already met or exceeded per the scoreboard.
