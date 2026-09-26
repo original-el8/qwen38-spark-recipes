@@ -18,7 +18,7 @@ distinguishes two decode metrics that our earlier campaign conflated:
 | cell (tok/s) | author r37 | this fleet (same methodology) | Δ |
 |---|---:|---:|---|
 | C1 decode **cold wall** | 53.5 (7.9K-token fixture; TTFT 1.80 s dominates) | **57.3–60.9** (stock+flags-off); **64.8** decode-max profile — but our `ctx0` cells are near-zero-prompt, so this row flatters us | weak-comparable |
-| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | campaign realistic-prompt C1: 75.9±24.9 stock `64d4c3e0`, 87.5±10.7 overlay `953b00ee` | **parity** (within noise) |
+| C1 decode realistic-prompt regime | 81.9 warm wall / 83.7–85.4 window (prefix-cached replays) | HISTORICAL images only: 75.9±24.9 (stock `64d4c3e0`), 87.5±10.7 (campaign `953b00ee`). **Current promoted config not yet measured realistic-prompt** — `tp4-bq-promoted-*` rows land after the LDB matrix series | parity on historical evidence; current-config cell pending |
 | C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **336.2** (campaign image `953b00ee`, N=3; current-image cell: see `tp4-ldb-promoted-*`) | lead, image-labelled |
 | prefill cold 16K | 3,394 (4.828 s / 16,384 tok, QAD-TP4-PREFILL.md) · 3,647–3,813 (r37) | **4,526–4,713** | **+24…+39%** |
 The mid-2026 rows in `SPARKRING.md` history ("author 4,853@8K … +6.6% gap") and the
