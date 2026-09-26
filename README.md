@@ -105,6 +105,9 @@ Switching image variants: `down` on all hosts, wait for :8000 release, `up` — 
 ID `953b00ee`) as `qwen38-qsa-selection-20260917-{0..3}`, API `maxwell:8000`. Promoted after
 matched A/B showed +34% cold prefill; confirmed live with image-manifest + RoCEnante markers
 and bench (cold prefill 4,894±10 @8K, 4,712 @16K, 4,556 @32K, 4,304 @64K; cold per-run).
+Both overlays additionally pin the operator engine-flag set (LM-head/MTP/overlap/fastpath —
+see `tp4/overlay.yml`); matched re-probe both topologies: prefill neutral, TP4 primed-C8
++8.4%, remainder inside MTP-acceptance noise (`*-flags7-*` rows).
 Rollback to stock = same files WITHOUT `-f overlay.yml` (project `qwen38-karmic-tp4-20260925`
 deployment dirs still on-host as the legacy stock stack). Promotion tool: `tools/cutover-campaign.sh`
 (port-release gate + capture-wait + performance gate + auto-rollback). Cutover lesson recorded:

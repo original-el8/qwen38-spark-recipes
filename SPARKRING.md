@@ -62,6 +62,16 @@ batch 11,392; OMP=1 + CPU pinning; recurrent-state fusion; 8-channel NCCL; SIRCL
 overlay on/off record exists in their repo. Our own matched A/B (`COMPARISON.md`, +34% cold
 prefill) remains the on/off evidence.
 
+## STATUS 2026-09-26: operator env set applied
+
+The seven operator engine flags (`VLLM_MXFP8_LM_HEAD`, `VLLM_LM_HEAD_A16`,
+`VLLM_MTP_NVFP4_LM_HEAD`, `VLLM_B12X_MOE_FP4_LAYER_MAX_INPUT_SCALE=w13`,
+`FLASH_NEXT_OVERLAP=1`, `MTP_COMPACT=1`, `GDN_SPEC_DECODE_METADATA_FASTPATH=1`) are pinned in
+`tp4/overlay.yml` + `tp2/overlay.yml` and live on the fleet. Matched probe (both topologies):
+prefill neutral, TP4 primed-C8 +8.4%, everything else inside acceptance-noise. `OVERLAP=0`
+in the old composes was confirmed template carry-forward, **not** an A/B verdict — no
+campaign record ever evaluated it and the original runners defaulted it ON.
+
 ## Test order on this fleet (one variable per run, bench-quick v3 + long-prefix gate)
 
 1. `VLLM_MTP_NVFP4_LM_HEAD=1` + `VLLM_LM_HEAD_A16=1` (decode C1/C8 + acceptance)

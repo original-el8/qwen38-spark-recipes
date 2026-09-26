@@ -13,7 +13,11 @@ carries the campaign TP2 delta — same `953b00ee` image but `VLLM_QWEN3_8_HC_PR
 MTP3. Provenance: [`profile.overlay.json`](profile.overlay.json). Validation + rollback
 tooling: [`../tools/tp2-campaign-validate.sh`](../tools/tp2-campaign-validate.sh) (manifest +
 RoCEnante marker proof, smoke, matched bench, TP4-overlay restore). Measured cells:
-`tp2-overlay-*` rows in [`../data/results.jsonl`](../data/results.jsonl).
+`tp2-overlay-*` rows in [`../data/results.jsonl`](../data/results.jsonl) — live-fleet matched
+probe 2026-09-26, pre-flags vs the operator flag set (`overlay.yml`): cold 8K prefill
+3,368.6±60.6 → 3,340.0±63.1 (neutral; HC sharding is off at TP2 so only the LM-head/MTP
+flags act); decode cold C1 55.6→62.7, C8 155.4→153.1; primed-8K C1 48.1→54.6, C8
+122.8→112.9 — all inside acceptance-dominated noise at this topology.
 
 ## Files
 
