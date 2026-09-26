@@ -1,0 +1,78 @@
+{
+  "schema": "qwen38-spark-recipe/1",
+  "id": "qwen38-flash-next-tp4-stock-base-20260925",
+  "topology": {
+    "type": "vllm-multiprocessing-tp4",
+    "hosts": [
+      {"host": "maxwell", "rank": 0, "role": "coordinator", "fabric_ip": "10.200.0.12", "secondary_ip": "10.200.1.12"},
+      {"host": "ampere", "rank": 1, "role": "headless_worker", "fabric_ip": "10.200.0.14", "secondary_ip": "10.200.1.14"},
+      {"host": "faraday", "rank": 2, "role": "headless_worker", "fabric_ip": "10.200.0.11", "secondary_ip": "10.200.1.11"},
+      {"host": "hertz", "rank": 3, "role": "headless_worker", "fabric_ip": "10.200.0.13", "secondary_ip": "10.200.1.13"}
+    ],
+    "rendezvous": {"master_addr": "10.200.0.12", "master_port": 29507},
+    "start_order": [1, 2, 3, 0],
+    "stop_order": [0, 1, 2, 3],
+    "endpoint": "http://maxwell:8000/v1"
+  },
+  "platform": {
+    "gpu": "NVIDIA GB10 (CUDA capability 12.1, arch sm_121a)",
+    "os": "Ubuntu 24.04 arm64",
+    "driver_observed": "580.173.02",
+    "memory_floor_mib_per_host": 16384,
+    "headroom_metric": "Linux MemAvailable after warmup and under load"
+  },
+  "image": {
+    "default_base": {
+      "repo": "eugr/spark-vllm-b12x",
+      "tag": "nightly-20260925",
+      "hub_manifest_digest": "sha256:c9e22735a5bb701c64b04ff9e08779d75d90abc045523fe0adf87b6092457c98",
+      "identity_checks": [
+        "docker image inspect -f '{{.Id}}' equal on all four hosts",
+        "docker run --rm --entrypoint cat <image> /workspace/b12x-source-commit (record sha)"
+      ],
+      "contents": "vLLM local-inference-lab/vllm@dev/karmic-kraken + local-inference-lab/b12x@master, torch 2.13.0, CUTLASS DSL 4.7.0"
+    },
+    "campaign_overlay_alternatives": [
+      {"tag": "spark-vllm:qwen38-padding-76061de4-b12x72baebbd-sm121-image-r1", "id": "sha256:a2fbec2f2e348631fad52413c61a1f72ed4df62c6d31c13b5cd6aa90a3540f7c", "kv": "bfloat16@28GiB or fp8_e4m3@42GiB", "build": "see build/README.md Path B"},
+      {"tag": "spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1", "id": "sha256:953b00ee516cac5f295bfb26863d3cfdcb5f950a6461bed76e11a84281468346", "kv": "fp8_e4m3@42GiB", "build": "see build/README.md Path B"}
+    ]
+  },
+  "model": {
+    "path": "/home/jasonc/models/Qwen3.8-Flash-Next-NVFP4",
+    "source_model": "Qwen/Qwen3.8-Flash-Next@de4b8e4d43b917e7706784d8bb445c9af86a3540",
+    "export_template": "local-inference-lab/Qwen3.8-Flash-Next-NVFP4@ada4da32a583a78aa47299f45a70603c950490b8",
+    "export_manifest_sha256": "8a0b93599e3edb4ab25357e8af16cf1ac2c6a61354fcec9d6aa50ee9fbf94397",
+    "config_override_sha256": "33d4220bd93677d0f566a93f53ee91e86970240d9c904a39faeb881946f08079",
+    "config_override_delta": {"index_share_for_mtp_iteration": false},
+    "weights_in_image": false,
+    "mount": {"source": "MODEL_PATH", "target": "/model", "read_only": true},
+    "served_model_names": ["Qwen3.8-Flash-Next", "qwen38-flash-next-nvfp4"]
+  },
+  "runtime": {
+    "tensor_parallel_size": 4, "pipeline_parallel_size": 1, "nnodes": 4,
+    "executor": "mp", "load_format": "instanttensor",
+    "dtype": "bfloat16", "quantization": "modelopt_mixed",
+    "max_model_len": 262144, "max_num_seqs": 16, "max_num_batched_tokens": 8192,
+    "block_size": 16, "kv_cache_dtype": "fp8_e4m3", "kv_cache_bytes_per_rank": 45097156608,
+    "gpu_memory_utilization": 0.80,
+    "mtp_speculative_tokens": 3,
+    "hc_tp_shard": true,
+    "attention": "auto via b12x/QSA config (stock); campaign stack passed --attention-backend B12X explicitly",
+    "moe_backend": "b12x", "linear_backends": "b12x", "gdn_decode_kernel": "b12x",
+    "prefix_caching": true, "chunked_prefill": true, "async_scheduling": true,
+    "roce_allreduce": {"enabled": true, "allreduce_max": "2MB", "allgather_max": "16MB"},
+    "cache_namespaces": ["vllm", "triton", "flashinfer", "b12x"],
+    "files": ["serve.sh", "compose.yml", "maxwell.env", "ampere.env", "faraday.env", "hertz.env", "config.json"]
+  },
+  "gates": {
+    "readiness": "rank0 log 'Application startup complete' (timeout 3600s)",
+    "behavior": "tools/smoke.sh (models, arithmetic@T0, qwen3_xml tool call, typed tool args) + long shared-prefix 64K@C4 / 128K@C8 edits",
+    "health": "all ranks: running, expected image ID, restarts=0, OOMKilled=false, preemptions=0",
+    "memory": "MemAvailable >= 16384 MiB on every rank under load",
+    "performance_probe": "tools/bench-quick.py; reference cells in ../data/results.jsonl"
+  },
+  "rollback": {
+    "procedure": "stop ranks 0->3; previous profile dir + its own cache namespaces + both images remain installed; start previous profile in its recorded order",
+    "ds41_neighbor": "the fleet may host DeepSeek-V4.1-Flash tp4 instead; its compose project and per-host dirs are the rollback neighbor (recorded in fleet deployments tree, not this repo)"
+  }
+}

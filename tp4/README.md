@@ -1,0 +1,92 @@
+# TP4 recipe — Qwen3.8-Flash-Next on four DGX Sparks
+
+Serves `Qwen3.8-Flash-Next` (and alias `qwen38-flash-next-nvfp4`) at
+`http://maxwell:8000/v1` with 262,144-token context, 16 concurrent sequences, and an
+FP8-E4M3 KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424
+tokens).
+
+## Files
+
+| file | role |
+|---|---|
+| `serve.sh` | in-container launch (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless) |
+| `compose.yml` | one service, parameterized by `<host>.env`; run once per host |
+| `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + per-profile caps |
+| `config.json` | checkpoint config override mounted at `/model/config.json` (`index_share_for_mtp_iteration=false`) |
+| `profile.json` | machine-readable manifest of the whole runtime contract |
+| `promotion-evidence.md` `qsa-selection-evidence.md` | raw campaign reports the numbers came from |
+
+## Bring-up
+
+Prereqs (all four hosts): image present with matching image ID; weights at
+`/home/jasonc/models/Qwen3.8-Flash-Next-NVFP4`; `/dev/infiniband` devices; these dirs:
+
+```bash
+mkdir -p ~/.cache/qwen38-karmic-tp4-<date>-{vllm,triton,flashinfer,b12x}
+```
+
+Start **workers, then coordinator**; stop **coordinator, then workers**:
+
+```bash
+D=qwen38-karmic-tp4-<date>
+for h in ampere faraday hertz; do
+  ssh $h "cd /home/jasonc/spark_vllm/deployments/$D && docker compose --env-file $h.env -p $D up -d"
+done
+ssh maxwell "cd /home/jasonc/spark_vllm/deployments/$D && docker compose --env-file maxwell.env -p $D up -d"
+```
+
+Readiness = coordinator log line `Application startup complete`
+(`VLLM_ENGINE_READY_TIMEOUT_S=3600`; a cold-cache start compiles/tritons for ~10+ min;
+warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick.py`.
+
+## Memory contract
+
+| quantity | value |
+|---|---|
+| KV budget / rank (`KV_CACHE_MEMORY_BYTES`) | 45,097,156,608 B (42 GiB) |
+| GPU utilization | 0.80 (of GB10 unified memory as CUDA device) |
+| KV pool exposed | 5,486,463 tokens, effective block 1,424 |
+| MemAvailable floor under load | ≥16 GiB on the limiting rank (measured min 16.05 GiB, maxwell) |
+| KV pool vs context limit | pool is aggregate capacity; per-request limit stays 262,144 |
+
+## Measured (campaign overlay image, FP8 KV, healthy arm)
+
+| workload | value | results.jsonl ids |
+|---|---:|---|
+| prefill 8K | 4,421.5 tok/s | `tp4-qsa-selection-prefill-8k` |
+| prefill 64K | 4,276.9 tok/s | `tp4-qsa-selection-prefill-64k` |
+| prefill 128K | 3,834.5 tok/s | `tp4-qsa-selection-prefill-128k` |
+| decode C1 cold | 81.9 tok/s (MTP accept 53.5%) | `tp4-qsa-selection-decode-ctx0-c1` |
+| decode C8 cold | 336.2 tok/s aggregate | `tp4-qsa-selection-decode-ctx0-c8` |
+| decode C1 @8K | 82.2 tok/s | `tp4-qsa-selection-decode-ctx8k-c1` |
+| decode C8 @8K | 327.9 tok/s aggregate | `tp4-qsa-selection-decode-ctx8k-c8` |
+
+Stock-base (karmic-nightly) cells are in `../COMPARISON.md`.
+
+## Verification gates passed (fleet, 2026-09-17/18 campaign + this re-validation)
+
+33/33 bounded behavior cases (arithmetic, tool call via `qwen3_xml`, prefix reuse, 8- and
+16-concurrent JSON retrieval at ~8K/64K/128K, changed-instructions-on-cached-context, vision);
+26/26 long shared-prefix + history-edit checks at 64K C4 / 128K C8; zero preemptions; zero OOM;
+all ranks healthy with matching image ID after each matrix. Full text:
+`qsa-selection-evidence.md`, `promotion-evidence.md`.
+
+## Pitfalls (each cost real time in the campaign)
+
+1. **Never share cache namespaces between profiles/dtypes.** FP8 vs BF16 KV select different
+   tuned kernels; a stale namespace silently changes kernels and invalidates A/B. The compose
+   mounts four per-profile cache dirs; create them fresh for a new profile.
+2. `NCCL_IB_MERGE_NICS=0` on this cabling; merging the two HCA functions breaks QP setup.
+3. `HC_TP` sharding (or `HC_PREFILL_MODE=shard` on the campaign image) is **TP4-only** —
+   TP2 must run replicated/off (see the tp2 recipe).
+4. The image may bake GLM-era env defaults; `serve.sh` unsets them. Keep those unsets.
+5. Big first-prefill variance on a fresh coordinator is a known flake (see root README honesty
+   box): re-measure a suspicious slow arm before drawing conclusions.
+6. FP8 KV quality limitation (LAVD loop) is documented in the root README — keep the BF16
+   fallback profile if your workload is long-reasoning-heavy.
+7. BF16-KV alternative: with `KV_CACHE_MEMORY_BYTES=30064771072` and no `--kv-cache-dtype`
+   override the same files reproduce the faster 28 GiB BF16 baseline (4,422.6 / 4,190.5 /
+   3,684.8 prefill; 85.6 C1) at 2.02M-token capacity — set
+   `LOAD_FORMAT=instanttensor`, drop `kv_cache_dtype`, keep everything else.
+
+See `DETAILS.md` for every flag and env var with its why.

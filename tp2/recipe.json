@@ -1,0 +1,27 @@
+{
+  "schema": "qwen38-spark-recipe/1",
+  "id": "qwen38-flash-next-tp2-stock-base-20260925",
+  "topology": {
+    "type": "vllm-multiprocessing-tp2",
+    "hosts": [
+      {"host": "maxwell", "rank": 0, "role": "coordinator", "fabric_ip": "10.200.0.12"},
+      {"host": "ampere", "rank": 1, "role": "headless_worker", "fabric_ip": "10.200.0.14"}
+    ],
+    "rendezvous": {"master_addr": "10.200.0.12", "master_port": 29507},
+    "start_order": [1, 0],
+    "stop_order": [0, 1],
+    "endpoint": "http://maxwell:8000/v1"
+  },
+  "image": {"default_base": "see ../tp4/recipe.json image.default_base", "campaign_overlay_alternatives": ["spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1 (id sha256:953b00ee516cac5f295bfb26863d3cfdcb5f950a6461bed76e11a84281468346)"]},
+  "runtime_over_tp4": {
+    "tensor_parallel_size": 2, "nnodes": 2,
+    "kv_cache_bytes_per_rank": 17179869184,
+    "hc_tp_shard": false,
+    "hc_note": "HC workspace sharding is admitted only at TP4; tp2 must run it off/replicated or startup fails",
+    "observed_kv_capacity_tokens": 1918359,
+    "observed_effective_block_tokens": 2848,
+    "min_mem_available_gib_measured": {"maxwell": 22.27, "ampere": 25.25}
+  },
+  "unchanged_from_tp4": ["model", "mtp_speculative_tokens", "max_model_len", "max_num_seqs", "max_num_batched_tokens", "block_size", "kv_cache_dtype", "gpu_memory_utilization", "load_format", "roce caps", "cache namespace discipline", "container contract"],
+  "gates": "same as tp4/recipe.json with hosts=[maxwell, ampere]"
+}

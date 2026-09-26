@@ -1,0 +1,33 @@
+# Qwen3.8-Flash-Next on 4x NVIDIA DGX Spark — agent entry point
+
+Purpose: reproduce our serving setup exactly, on any 2- or 4-node DGX Spark fleet with a
+dual-NIC RoCE fabric.
+
+Read order:
+1. `tp4/recipe.json` or `tp2/recipe.json` — machine-readable contract (hosts, ranks, digests,
+   flags, env, orders, gates).
+2. `tp4/serve.sh` + `tp4/compose.yml` + `tp4/*.env` — the runnable set (compose is
+   topology-parameterized; tp2 dir ships ready 2-node envs).
+3. `tp4/DETAILS.md` — per-flag/per-env rationale; `*/README.md` — operations + pitfalls.
+4. `data/results.jsonl` — every published number; `data/README.md` — measurement method.
+5. `build/README.md` — image provenance: stock `eugr/spark-vllm-b12x` nightly (default) vs
+   campaign overlay lineage (digests, source commits, rebuild recipe).
+
+Hard invariants (violating any of these produces a broken or dishonest deployment):
+- All ranks run the SAME image ID (check `docker image inspect -f '{{.Id}}'`, not just tags).
+- Start ranks workers→coordinator; stop coordinator→workers.
+- `NCCL_IB_MERGE_NICS=0`, `NCCL_IB_GID_INDEX=3`, HC TP-shard ONLY at TP4 (`HC_TP=0` at TP2).
+- Fresh per-profile cache namespaces (vllm/triton/flashinfer/b12x); never share across
+  profiles or KV dtypes.
+- Keep MemAvailable >= 16 GiB on the limiting rank: the KV budget env var is a safety
+  setting, not a capacity knob.
+- Verify with `tools/smoke.sh` before benchmarking; re-run any suspiciously slow cell before
+  recording it (one-off coordinator slowdowns are documented).
+- FP8 KV has a documented quality caveat (root README "honesty box"); use the BF16 variant in
+  `tp4/README.md` pitfall 7 for long-reasoning-heavy traffic.
+
+Fleet facts specific to this repo's numbers (substitute your own):
+- ranks: maxwell .12 (r0), ampere .14 (r1), faraday .11 (r2), hertz .13 (r3) on 10.200.0.0/23;
+- GB10 121 GiB per host, driver 580.x, Ubuntu 24.04 arm64;
+- weights at /home/jasonc/models/Qwen3.8-Flash-Next-NVFP4 + config.json override (sha256
+  33d4220b…f08079).
