@@ -21,8 +21,7 @@ services:
       # serve.sh variant flags (overlay build only — stock CLI rejects these)
       ATTENTION_BACKEND: B12X
       RECURRENT_CHECKPOINT_POLICY: aligned
-      # Base compose pins V2 runner "1"; an override must set a value ("" crashes the
-      # engine's int parse; unset inherits the base). The campaign ran this UNSET (None);
-      # "0" parses to False — the only settable near-equivalent, live-verified 2026-09-26:
-      # prefill/decode match the campaign arm within noise, smoke 4/4.
-      VLLM_USE_V2_MODEL_RUNNER: "0"
+      # V2 runner: this model REQUIRES the V2 model runner. Empirically proven 2026-09-26:
+      # pinning "0" crashes at engine init (legacy path lacks Qwen3_8FlashNextConfig.
+      # image_token_index). Base compose ships "1"; the campaign ran unset (None=auto→V2),
+      # which is equivalent — so DO NOT override here. (Line intentionally absent.)
