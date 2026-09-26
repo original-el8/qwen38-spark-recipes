@@ -121,14 +121,14 @@ with exit 137 during long prefill).
 - A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
   seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
   arm before recording it.
-- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,7xx,
-  same image ID, byte-equal cache inventories (verified). Leading hypothesis: the shipped
-  default promotes TWO levers (block32 × b12x-spec-backends) each validated **singly** in
-  campaign A/Bs — the combination was never measured as one arm; it interacts
-  super-additively on decode (31→36.1 steps/s, beyond either alone) while costing
-  prefill. Single-variable re-attribution arm (`MTP_BACKENDS_IN_SPEC=0`, block32 kept)
-  is queued; until it lands, headline tables quote the LOW (steady, two-repeat) cluster
-  and high-cluster rows are upper bound only.
+- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,9k.
+  Tested and REJECTED: image ID (identical), cache contents (byte-equal, bg_15), spec-backend
+  × block32 interaction (`tp4-ldb-nospec-b32-*`: prefill unmoved). What remains true: every
+  4.5k+ number we or the author ever recorded ran with the author's ENGINE-FLAG SUITE ON
+  (`HC_PREFILL_MODE=shard`, `PREFILL_COALESCE`, `MTP_COMPACT`, `OVERLAP`, LM-head trio,
+  spec fastpath, `fuse_act_quant` + capture-size list) — our promoted default ships without
+  it (suite was retired on warm-regime isolated probes: wrong instrument, own goal).
+  Ship-candidate arm with the full suite restored is under measurement now.
 - Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
   `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
   both before crediting any change.
