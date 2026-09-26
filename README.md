@@ -99,9 +99,9 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 | [`tp4/`](tp4/README.md) | four-Spark recipe: README, DETAILS (every env var + flag), runnable files |
 | [`tp2/`](tp2/README.md) | two-Spark recipe (maxwell+ampere) |
 | [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
-| [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe) |
-| [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl) |
-| `COMPARISON.md` | stock karmic-base image vs campaign overlay image, matched cells |
+| [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
+| [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
+| `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched cells |
 | `llms.txt` | agent entry point |
 
 ## Reading the numbers

@@ -32,7 +32,7 @@ Pin used by these recipes:
 ```text
 eugr/spark-vllm-b12x:nightly-20260925
   hub manifest digest  sha256:c9e22735a5bb701c64b04ff9e08779d75d90abc045523fe0adf87b6092457c98
-  image ID (config)    sha256:64d4c3e03dbd76bb4fd00f99bce3dcdfbc3d7110d6823a88c4aaf6456e6fe368   (observed 2026-09-25; `tools/cutover-tp4.sh` requires this ID on all four hosts before start)
+  image ID (config)    sha256:64d4c3e03dbd76bb4fd00f99bce3dcdfbc3d7110d6823a88c4aaf6456e6fe368   (ID-MATCH verified on all four Sparks 2026-09-25; distributed from maxwell over the 200G fabric, ~145 s/peer via docker save|zstd|ssh)
   /workspace/b12x-source-commit: a7d7d29b2ef8869086e0ceaa787321f17544e3c9
 ```
 
