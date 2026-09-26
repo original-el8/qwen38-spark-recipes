@@ -5,7 +5,7 @@ NVIDIA DGX Spark cluster with a dual-NIC RoCE fabric. Two topologies ship here:
 
 | recipe | hosts | what it is |
 |---|---|---|
-| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — one `compose.yml`, `-f overlay.yml` switches stock base → campaign overlay (serving default) |
+| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — stock nightly default; optional `overlay.decode-max.yml` profile (C1 64.8 tok/s) |
 | [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left — same compose + overlay-override pattern |
 
 Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
@@ -13,12 +13,12 @@ Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
 
 ## Results
 
-Live re-validation on the stock base (image ID `sha256:64d4c3e0…`) 2026-09-25: TP4 serving,
-4/4 behavior smoke, all-rank health; matched probe cells in `data/results.jsonl`
-(`tp4-stock-karmic-*`). Full campaign matrices (BF16/FP8, tp4/tp2, HC/MoE/MTP/RoCE ablations)
-in [`data/results.jsonl`](data/results.jsonl) + [`data/campaign-matrix.json`](data/campaign-matrix.json).
-Stock-vs-overlay A/B verdict: [`COMPARISON.md`](COMPARISON.md) — overlay wins cold prefill
-(+34.2%) and cold decode (+15-16%); stock wins primed-context decode (+13.6/+25.7%).
+Headline (fast LDB matrix, cold, same prompts; `tp4-ldb-*` rows): prefill 8K 4,35x /
+16K 4,704 / 128K 3,825 tok/s; decode C1 56.6–58.8 tok/s cold-wall, **64.8** on the
+decode-max profile. Author-parity scoreboard and methodology-artifact correction
+(wall vs decode-window): [`SPARKRING.md`](SPARKRING.md). Full campaign matrices
+(BF16/FP8, tp4/tp2, HC/MoE/MTP/RoCE ablations):
+[`data/results.jsonl`](data/results.jsonl) + [`data/campaign-matrix.json`](data/campaign-matrix.json).
 
 ## Hardware
 
@@ -67,27 +67,30 @@ in-checkpoint `config.json` only by `"index_share_for_mtp_iteration": false`.
 
 ## Images
 
-Serving default: the **campaign overlay** (built from pinned sources, reproducible via
-`build/`). Stock fallback base: **`eugr/spark-vllm-b12x`** nightlies from Docker Hub
-(vLLM `dev/karmic-kraken` + b12x `master`) — the original goal's mandated base, still
-published verbatim. Full provenance, digests, and the rebuild recipe:
+Serving default: **`eugr/spark-vllm-b12x:nightly-20260925`** (vLLM
+`dev/karmic-kraken` + b12x pin) from Docker Hub — the original goal's mandated base,
+published verbatim. It absorbed the former campaign overlay's content; that overlay is
+retired ([`COMPARISON.md`](COMPARISON.md)). The optional decode-max profile is a thin
+rebuild over this same tag (newer b12x wheel; sha256-pinned in
+[`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml)). Full provenance and digests:
 [`build/README.md`](build/README.md).
 
-## Quick start (tp4, either image variant)
+## Quick start (tp4, default config)
 
 ```bash
-# 1) pick base or overlay, on every host — base is a pull, overlay is a build (build/README.md)
+# 1) base image pull on every host (public hub, no fleet-local bits):
 docker pull eugr/spark-vllm-b12x:nightly-20260925
 
-# 2) stage tp4/{compose.yml,overlay.yml,serve.sh,config.json,<host>.env} into $DEPLOY_DIR
-#    on each host; create cache dirs $(dirname): compose binds $CACHE_ROOT-{vllm,triton,...}
+# 2) stage tp4/{compose.yml,serve.sh,config.json,<host>.env} into $DEPLOY_DIR on each
+#    host; create cache dirs $(dirname): compose binds $CACHE_ROOT-{vllm,triton,...}.
+#    For the decode-max profile also build tp4/overlay.decode-max.yml's image (its header)
+#    and add `-f overlay.decode-max.yml` below.
 
-# 3) workers first (ampere, faraday, hertz), then coordinator (maxwell) — drop `-f overlay.yml`
-#    for the stock base:
-ssh ampere  'cd $DEPLOY_DIR && docker compose --env-file ampere.env  -p myproj -f compose.yml -f overlay.yml up -d'
-ssh faraday 'cd $DEPLOY_DIR && docker compose --env-file faraday.env -p myproj -f compose.yml -f overlay.yml up -d'
-ssh hertz   'cd $DEPLOY_DIR && docker compose --env-file hertz.env   -p myproj -f compose.yml -f overlay.yml up -d'
-ssh maxwell 'cd $DEPLOY_DIR && docker compose --env-file maxwell.env -p myproj -f compose.yml -f overlay.yml up -d'
+# 3) workers first (ampere, faraday, hertz), then coordinator (maxwell):
+ssh ampere  'cd $DEPLOY_DIR && docker compose --env-file ampere.env  -p myproj -f compose.yml up -d'
+ssh faraday 'cd $DEPLOY_DIR && docker compose --env-file faraday.env -p myproj -f compose.yml up -d'
+ssh hertz   'cd $DEPLOY_DIR && docker compose --env-file hertz.env   -p myproj -f compose.yml up -d'
+ssh maxwell 'cd $DEPLOY_DIR && docker compose --env-file maxwell.env -p myproj -f compose.yml up -d'
 
 # 4) readiness = live API (log grepping false-passes on reused containers):
 until curl -sf http://maxwell:8000/v1/models >/dev/null; do sleep 15; done   # cold compile ~10 min
@@ -99,26 +102,29 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 Switching image variants: `down` on all hosts, wait for :8000 release, `up` — see
 `tools/cutover-campaign.sh` for the gated version.
 
-## Fleet state (2026-09-26)
+## Fleet state (2026-09-26, final)
 
-**Serving: Path B campaign overlay** (`spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1`,
-ID `953b00ee`) as `qwen38-qsa-selection-20260917-{0..3}`, API `maxwell:8000`. Promoted after
-matched A/B showed +34% cold prefill; confirmed live with image-manifest + RoCEnante markers
-and bench (cold prefill 4,894±10 @8K, 4,712 @16K, 4,556 @32K, 4,304 @64K; cold per-run).
-Both overlays additionally pin the operator engine-flag set (LM-head/MTP/overlap/fastpath —
-see `tp4/overlay.yml`). Matched re-probe with VERIFIED arms on both topologies (fresh
-staging dirs + in-container env proofs): TP4 prefill neutral, primed-C8 +8.4%, decode C1
-acceptance-noisy; TP2 **neutral in every cell** (`*-flags7-*` + `tp2-overlay-preflags-verified-*`
-rows). The unified one-compose files are live-validated serving the TP2 overlay variant
-(2026-09-26) — that live test is also how a V2-runner pin crash was caught and the pin
-removed (`tp2/overlay.yml` comment); TP4-side unified files are `docker compose config`-
-validated with live confirmation at the next `tools/cutover-campaign.sh` cutover.
-Rollback to stock = same files WITHOUT `-f overlay.yml` (project `qwen38-karmic-tp4-20260925`
-deployment dirs still on-host as the legacy stock stack). Promotion tool: `tools/cutover-campaign.sh`
-(port-release gate + capture-wait + performance gate + auto-rollback). Cutover lesson recorded:
-`compose stop <service>` with a guessed service name silently no-ops — the 2026-09-26 false
-"overlay regression" was stock still bound to :8000 (EADDRINUSE on the overlay coordinator);
-always `compose down` and gate on port release.
+**Serving: promoted stock config** — `eugr/spark-vllm-b12x:nightly-20260925` with the
+recipe defaults (block-size 32, b12x backends inside `--speculative-config`, no engine-flag
+suite: every flag measured neutral-or-noise in matched arms; the campaign overlay image is
+retired, its content absorbed by this nightly). Deploy dir
+`/home/jasonc/spark_vllm/deployments/qwen38-promoted-20260926/` on each rank, API
+`maxwell:8000`. Fast-matrix cells: prefill 8K 4,35x / 16K up to 4,704 / 128K 3,825; cold
+decode C1 56.6–58.8 (`tp4-ldb-*` rows).
+
+**Author scoreboard** ([`SPARKRING.md`](SPARKRING.md)): this config beats the Fujitsu
+sparkring r37 reference on every like-for-like cell — cold-wall C1 decode 53.5 → ours
+57.3+, C8 255–259 → ours 336, cold prefill 3,65x–3,81x → ours 4,4–4,7xx. The previously
+believed "author gap" was warm-window vs cold-wall metric conflation, now fixed in
+`data/results.jsonl` (`author-r37-*` rows carry wall + window + TTFT).
+
+Optional profile: [`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml) — newer b12x
+wheel over the same nightly + engine-flag suite + block32: C1 **64.8 tok/s** (steps/s 37.0,
++18%), prefill ≈author-level. Build recipe + wheel sha256 in the overlay header.
+
+Variant switching stays gated: `down` on all hosts → wait for :8000 release → `up`
+(`tools/cutover-campaign.sh` pattern; `compose stop <service>` with a guessed name silently
+no-ops — gate on port release, always).
 
 ## Repo map
 
@@ -129,7 +135,7 @@ always `compose down` and gate on port release.
 | [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
 | [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
 | [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
-| [`SPARKRING.md`](SPARKRING.md) | applicability of Fujitsu sparkring profile levers to this fleet (verified envs, test order, retained negatives) |
+| [`SPARKRING.md`](SPARKRING.md) | Fujitsu sparkring parity resolution: author r37 scoreboard (we lead cold-wall on every cell), env-lever verdict table, b12x pairing law, retained negatives |
 | `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
 | `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
 | `llms.txt` | agent entry point |

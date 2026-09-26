@@ -5,27 +5,30 @@ Serves `Qwen3.8-Flash-Next` (and alias `qwen38-flash-next-nvfp4`) at
 FP8-E4M3 KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424
 tokens).
 
-## Two variants, one compose
+## Default and optional profile
 
-`compose.yml` serves BOTH image variants; `overlay.yml` is the complete overlay delta
-(image + engine envs, nothing else — read it, it's ~20 lines):
+`compose.yml` alone is the serving default: stock
+`eugr/spark-vllm-b12x:nightly-20260925` + recipe defaults (block-size 32; b12x backends
+inside `--speculative-config` via `serve.sh`). The former campaign overlay is RETIRED —
+this nightly absorbed its content ([`../COMPARISON.md`](../COMPARISON.md) supersession
+banner; prefill/decode cells in `../data/results.jsonl` `tp4-ldb-*` / `tp4-stock-karmic-*`).
 
 ```bash
 # workers first (ampere, faraday, hertz), coordinator (maxwell) last — on each host:
 cd $DEPLOY_DIR   # staged copy of these files + config.json + serve.sh
-docker compose --env-file <host>.env -p <project>          [-f overlay.yml] up -d
-docker compose --env-file <host>.env -p <project>          [-f overlay.yml] down   # name-safe stop
+docker compose --env-file <host>.env -p <project> up -d
+docker compose --env-file <host>.env -p <project> down   # name-safe stop
+# optional decode-max profile (build its image first, header of the overlay):
+docker compose --env-file <host>.env -p <project> -f overlay.decode-max.yml up -d
 ```
 
-- **Without `-f overlay.yml`** → stock base `eugr/spark-vllm-b12x:nightly-20260925`
-  (the goal's base-image recipe; rebuilds from Docker Hub; faster primed-context decode).
-- **With `-f overlay.yml`** → campaign overlay `953b00ee` (build via
-  [`../build/README.md`](../build/README.md)); the **serving default on this fleet since
-  2026-09-26** after the matched A/B ([`../COMPARISON.md`](../COMPARISON.md)): cold prefill
-  4,894±10 (8K) / 4,712 (16K) / 4,556 (32K) / 4,304 tok/s (64K) = +34%.
-  Its machine-readable provenance: [`profile.overlay.json`](profile.overlay.json).
-- `serve.sh` is one env-gated script for both (`ATTENTION_BACKEND`,
-  `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ stock behavior).
+- **Default** → prefill champion (16K 4,704; 128K 3,825) + cold C1 56.6–58.8; author
+  scoreboard in [`../SPARKRING.md`](../SPARKRING.md) — leads every like-for-like cell.
+- **Decode-max overlay** → C1 64.8 tok/s (steps/s 37.0); prefill ≈author-level. Same
+  weights, same base tag; the delta is a sha256-pinned b12x wheel + engine-flag envs.
+- `serve.sh` is one env-gated script for all variants (`ATTENTION_BACKEND`,
+  `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ default behavior;
+  `MTP_BACKENDS_IN_SPEC=0` opts out of b12x spec backends; `ASYNC_SCHED=0` off).
 - Switching variants on a live fleet: full `down` + port-release wait + `up` — NEVER a
   targeted `stop <service>` (name-safe lesson, 2026-09-26 EADDRINUSE false-regression;
   gated promotion tool: [`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh)).
@@ -36,10 +39,9 @@ docker compose --env-file <host>.env -p <project>          [-f overlay.yml] down
 |---|---|
 | `serve.sh` | ONE env-gated launcher for both variants (rank-aware; `NODE_RANK` 0 = coordinator, 1–3 headless; overlay-only flags activate via env) |
 | `compose.yml` | one service, parameterized by `<host>.env`; run once per host, per variant |
-| `overlay.yml` | the COMPLETE image+env overlay delta (`docker compose -f compose.yml -f overlay.yml`) |
+| `overlay.decode-max.yml` | the ONE optional overlay (image + env delta, ~20 lines); default config needs no overlay |
 | `maxwell.env` `ampere.env` `faraday.env` `hertz.env` | rank/fabric identity + KV budget + paths |
 | `config.json` | checkpoint config override mounted at `/model/config.json` (`index_share_for_mtp_iteration=false`) |
-| `profile.overlay.json` | machine-readable manifest of the overlay runtime (image ID, cache namespaces, orders) |
 | `recipe.json` | machine-readable contract for the stock base variant |
 | `promotion-evidence.md` `qsa-selection-evidence.md` | raw campaign reports the numbers came from |
 

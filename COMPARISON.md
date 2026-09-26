@@ -1,7 +1,15 @@
 # Stock karmic-nightly vs campaign overlay image — matched probe
 
-The question this repo has to answer honestly: what do you give up by serving on the public
-`eugr/spark-vllm-b12x` nightly (Path A, the published default) instead of the fleet's
+> **SUPERSEDED 2026-09-26.** The `eugr/spark-vllm-b12x:nightly-20260925` tag absorbed the
+> campaign overlay's content (HC shard/coalesce, QSA selection, MoE padding; rows
+> `tp4-stock-karmic-*` match-or-beat `tp4-campaign-overlay-probe-*` cells). The campaign
+> image and `overlay.yml` are retired; the published default is the stock nightly
+> (now with block-size 32 + b12x spec-config backends as recipe defaults). The
+> historical probe below stays as methodology evidence — one tool, both stacks, cold-cache
+> by construction.
+
+The question this probe answered: what did serving on the public
+`eugr/spark-vllm-b12x` nightly (Path A, then `64d4c3e0`) give up versus the fleet's
 campaign overlay (Path B, [`build/README.md`](build/README.md))?
 
 Measured **2026-09-25 on this fleet** with one tool against both stacks, same topology, same
@@ -41,10 +49,10 @@ Rows: `data/results.jsonl` ids `tp4-stock-karmic-*` / `tp4-campaign-overlay-prob
 
 ## What the published recipe is, and why
 
-As of 2026-09-26 **Path B is the published and serving default** (`tp4/overlay.yml`,
-`tp2/overlay.yml` — the complete overlay delta as a compose override of the base recipe): operator decision after this A/B, since
-the overlay is fully reconstructable (`build/README.md`, build contexts + dist archives
-retained on maxwell) and the prefill gap dominates serving traffic. **Path A** (`tp4/`,
-`tp2/` root files) remains published unchanged as the stock fallback: rebuilds from a public
-hub tag with no fleet-local bits, wins primed-context decode, and is one gated
-`compose down`/`up` away.
+As of 2026-09-26 the recipe ships **one default and one documented profile**:
+`tp4/` + `tp2/` root files on the stock nightly (Path A, public hub tag, no fleet-local
+bits, block32 + b12x spec backends defaulted in), and
+[`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml) — a thin rebuild
+(newer b12x wheel over the same nightly) for decode-dominant serving: C1 64.8 tok/s,
+prefill ≈author-level. Author-parity claims and the full lever evidence:
+[`SPARKRING.md`](SPARKRING.md).

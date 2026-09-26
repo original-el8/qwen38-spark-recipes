@@ -36,3 +36,19 @@ Every number quoted in a `README.md` or `DETAILS.md` in this repository is one l
 The raw sample files, metric snapshots, and rank-health captures for these rows live in the
 fleet under `/home/jasonc/spark_vllm/benchmark-results/qwen38-*` (operator host, not
 published). The `source` field names the summary document each row was transcribed from.
+
+## Metric vocabulary — author reference rows (`author-r37-*`)
+
+External rows from the Fujitsu sparkring record `r37-shared-tp4.json` carry two distinct
+decode metrics and they are NOT interchangeable:
+
+- `mean` = `aggregate_wall_tps` — output tokens over wall time INCLUDING TTFT. This is
+  the metric comparable to llm_decode_bench and any cold client.
+- `decode_window_tps` = `aggregate_decode_window_tps` — decode-window only, prefix-warm
+  fixtures, TTFT excluded. Structurally higher (their C1: 83.7–85.4 window vs 53.5 wall).
+
+Comparing a window number against a wall number manufactured the 2026-09 "author decode
+gap"; the earlier relayed rows (`sparkring-author-*`, prefill 4,853–4,923) were that
+conflation and have been REMOVED from this file — the raw JSON rows above are the
+reference. Their prefill rows (`author-r37-prefill-*`, 3,647–3,813 cold) agree with their
+own `QAD-TP4-PREFILL.md` (16,384 tok / 4.828 s = 3,394).

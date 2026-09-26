@@ -4,31 +4,26 @@ Serves the same checkpoint from **maxwell (rank 0) + ampere (rank 1)** at
 `http://maxwell:8000/v1`. Same context (262,144), same MTP3, FP8 KV at **16 GiB per rank →
 1,918,359 tokens** (effective block 2,848), with ≥22 GiB MemAvailable left on every host.
 
-## Two variants, one compose
+## Serving config
 
-Identical structure to [`../tp4/`](../tp4/README.md): `docker compose --env-file <host>.env
--p <project> [-f overlay.yml] up -d` on maxwell (rank0) + ampere (rank1). `overlay.yml`
-carries the campaign TP2 delta — same `953b00ee` image but `VLLM_QWEN3_8_HC_PREFILL_MODE=off`
-(token-row sharding targets ≥3 ranks), coalescing + LM-head/MTP flags on, KV 16 GiB/rank,
-MTP3. Provenance: [`profile.overlay.json`](profile.overlay.json). Validation + rollback
-tooling: [`../tools/tp2-campaign-validate.sh`](../tools/tp2-campaign-validate.sh) (manifest +
-RoCEnante marker proof, smoke, matched bench, TP4-overlay restore). Flag effect, **verified
-arms only** — fresh staging dir, fresh cache namespaces, unified files, in-container env
-proof on both sides (`tp2-overlay-preflags-verified-*` vs `tp2-overlay-flags7-*`):
-prefill 8K 3,391±65 → 3,340±63; decode cold C1 54.3→62.7, C8 158.4→153.1; primed-8K
-C1 52.0→54.6, C8 **113.9±0.9 → 112.9±2.5 — neutral everywhere** (HC sharding is off at
-TP2, so only the LM-head/MTP flags act). Disclosed caveats: the earlier
-`tp2-overlay-baseline-*` rows ran from the live dir during a mid-campaign compose patch —
-their unflagged env is corroborated (container-reuse evidence + the verified prefill match)
-but the verified rows are authoritative; and this probe reads ~0.5× the campaign-methodology
-primed-C8 figures (114 here vs the 226.6 row above — TP4 shows the same 327.9→193.6 ≈0.59×
-ratio), a random-token-probe methodology gap identical on both topologies, not a regression.
+Identical structure to [`../tp4/`](../tp4/README.md): stock
+`eugr/spark-vllm-b12x:nightly-20260925` + defaults, no overlay — `docker compose
+--env-file <host>.env -p <project> up -d` on maxwell (rank0) + ampere (rank1). The
+campaign TP2 delta (`overlay.yml` + `profile.overlay.json`) is RETIRED with its image:
+the current nightly carries the same content, and the verified flag A/B measured the
+suite **neutral in every cell** — history rows `tp2-overlay-flags7-*` /
+`tp2-overlay-preflags-verified-*` (`tp2-overlay-baseline-*` ran mid-compose-patch and
+are corroborated but not authoritative). HC sharding is OFF at TP2 (token-row sharding
+requires ≥3 ranks), so only the LM-head/MTP flags acted there: prefill 8K 3,391±65 →
+3,340±63; decode cold C1 54.3→62.7, C8 158.4→153.1; primed-8K C1 52.0→54.6, C8
+113.9±0.9 → 112.9±2.5 (acceptance-noise on cold C1). Probe reads ~0.5×
+campaign-methodology primed figures (random-token gap, identical on both topologies —
+not a regression). Validation/rollback tooling:
+[`../tools/tp2-campaign-validate.sh`](../tools/tp2-campaign-validate.sh).
 
 ## Files
 
-`serve.sh`, `compose.yml`, `overlay.yml` (serving default) + `overlay.no-flags.yml`
-(measured pre-flag baseline), `maxwell.env`, `ampere.env`, `config.json`,
-`profile.overlay.json` — same
+`serve.sh`, `compose.yml`, `maxwell.env`, `ampere.env`, `config.json` — same
 contract as [`../tp4/`](../tp4/README.md) with exactly these differences:
 
 | item | tp4 | tp2 | why |

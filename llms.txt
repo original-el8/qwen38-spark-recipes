@@ -4,17 +4,20 @@ Purpose: reproduce our serving setup exactly, on any 2- or 4-node DGX Spark flee
 dual-NIC RoCE fabric.
 
 Read order:
-1. `tp4/compose.yml` + `tp4/overlay.yml` (same pair in `tp2/`) — ONE compose, two variants:
-   base = stock `eugr/spark-vllm-b12x` nightly; `-f overlay.yml` = campaign overlay image +
-   full engine-env delta (the serving default on this fleet since 2026-09-26). Overlay image
-   build: `build/README.md`; overlay provenance: `*/profile.overlay.json`.
-2. `tp4/serve.sh` + `tp4/compose.yml` + `tp4/*.env` — the stock runnable set (compose is
-   topology-parameterized; tp2 dir ships ready 2-node envs). Validation/promotion with gates:
-   `tools/cutover-campaign.sh`, `tools/tp2-campaign-validate.sh`, `tools/campaign-ab-probe.sh`.
+1. `tp4/compose.yml` + `tp4/serve.sh` + `tp4/*.env` (same set in `tp2/`) — the serving
+   default: stock `eugr/spark-vllm-b12x` nightly, no overlay (block32 + b12x spec-config
+   backends are recipe defaults). Optional profile: `tp4/overlay.decode-max.yml`
+   (newer-b12x image + engine-flag suite; image build + wheel sha256 in its header).
+2. `SPARKRING.md` — the parity scoreboard against the Fujitsu sparkring r37 reference and
+   WHY: cold-wall vs decode-window metrics (the old "author gap" was that conflation),
+   one-variable lever verdicts, and the b12x pairing law (don't swap b12x wheels blindly —
+   stale mainline FAILS startup; only fresh main satisfies the vLLM API).
 3. `tp4/DETAILS.md` — per-flag/per-env rationale; `*/README.md` — operations + pitfalls.
-4. `data/results.jsonl` — every published number; `data/README.md` — measurement method.
-5. `build/README.md` — image provenance: stock `eugr/spark-vllm-b12x` nightly (default) vs
-   campaign overlay lineage (digests, source commits, rebuild recipe).
+4. `data/results.jsonl` — every published number (`author-r37-*` = reference rows,
+   `tp4-ldb-*` = fast-matrix arms); `data/README.md` — measurement method.
+5. Repro tools: `tools/ldb-fast-matrix.sh` (gated lever cycle + llm_decode_bench readout),
+   `tools/smoke.sh`, `tools/bench-quick.py`, `tools/cutover-campaign.sh`; image provenance
+   in `build/README.md` (campaign-overlay lineage is historical, kept for provenance).
 
 Hard invariants (violating any of these produces a broken or dishonest deployment):
 - All ranks run the SAME image ID (check `docker image inspect -f '{{.Id}}'`, not just tags).
