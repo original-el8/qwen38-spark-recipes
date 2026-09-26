@@ -10,7 +10,7 @@ HOSTS="maxwell ampere faraday hertz"
 
 restore_stock() {
   echo "== ROLLBACK: stop campaign, restore stock TP4"
-  for h in $HOSTS; do ssh $h "cd $DDIR && docker compose -p $CPROJ down --timeout 30" >/dev/null 2>&1; done
+  for h in $HOSTS; do ssh $h "cd $DDIR && docker compose --env-file $h.env -p $CPROJ down --timeout 30" >/dev/null 2>&1; done
   for r in 1 2 3 0; do
     h=$( [ $r = 0 ] && echo maxwell || { [ $r = 1 ] && echo ampere || { [ $r = 2 ] && echo faraday || echo hertz; }; } )
     ssh $h "cd $CDIR && docker compose -p $CP up -d" >/dev/null 2>&1
@@ -28,10 +28,10 @@ done
 
 echo "== start campaign overlay: workers (ampere,faraday,hertz) then coordinator (maxwell)"
 for h in ampere faraday hertz; do
-  ssh $h "cd $DDIR && docker compose -p $CPROJ up -d" >/dev/null || { echo "FAIL: $h"; restore_stock; exit 1; }
+  ssh $h "cd $DDIR && docker compose --env-file $h.env -p $CPROJ up -d" >/dev/null || { echo "FAIL: $h"; restore_stock; exit 1; }
   sleep 20
 done
-ssh maxwell "cd $DDIR && docker compose -p $CPROJ up -d" >/dev/null || { echo "FAIL: maxwell"; restore_stock; exit 1; }
+ssh maxwell "cd $DDIR && docker compose --env-file maxwell.env -p $CPROJ up -d" >/dev/null || { echo "FAIL: maxwell"; restore_stock; exit 1; }
 
 echo "== wait live API readiness (maxwell:8000)"
 READY=0
