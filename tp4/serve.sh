@@ -88,7 +88,7 @@ exec "${engine[@]}" \
   --gdn-decode-kernel b12x \
   --mm-encoder-tp-mode data \
   --mm-processor-cache-gb 0 \
-  --limit-mm-per-prompt '{"image":1}' \
+  --limit-mm-per-prompt '{"image":8,"video":2}' \
   --enable-prefix-caching \
   --async-scheduling \
   --moe-backend "${MOE_BACKEND:-b12x}" \
