@@ -38,3 +38,15 @@ The withdrawn-era 4,354 prefill row does not replicate under identity gates.
 ## Correctness protocol (required before believing any temp-0 spec number)
 `/v1/completions` with `temperature:0, logprobs:5`: every emitted token's logprob must equal its row max (tolerance 1e-4). All three r6c configs: 128/128 exact.
 BYTE-level corpus diffing across runs is NOT a valid oracle on this fork: same engine + same config re-captures diverge at 2-373 chars (continuous-batch tie flips near equal logits). First-diff depth must be compared against the same-engine drift band before indicting any config.
+
+## Executable reproduction
+```
+tools/build-r6-tree.sh                     # tree2/vllm from public sources (checks: CLEAN x6, TREE2-BUILD-READY)
+docker build -f recipes/Dockerfile.r6 .    # from a ctx with tree2/ and recipes/ple5/ (bakes verify6 gauntlet)
+```
+ple5/ ships the four measured b12x PLE files (sha256 ee518db0 510aa7cd 52814e84 789cb018).
+
+## Measurement protocol (what the data-row regimes mean)
+- LDB canonical: `--standalone-prefill --concurrency 1 --duration 20 --contexts 0`, explicit `--temperature`; cycles default to the profile's 0.0.
+- **cold** = first LDB run against a freshly loaded engine; **warm** = second+. On this fork the cold penalty is ~10-20% of decode; rows are labeled, never averaged across regimes.
+- Accept band {2.15–2.85} at temp-0 reflects regime + near-tie tie-flip variance under continuous batching (same-config replicate spread: 87.1–103.5 tok/s); step rate is the stable invariant (35.8–37.4).
