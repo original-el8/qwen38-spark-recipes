@@ -46,7 +46,8 @@ done
 [ "$READY" = 1 ] || { echo "FAIL: readiness cap"; ssh maxwell "docker logs --tail 40 $CPROJ-0"; restore_stock; exit 1; }
 
 echo "== smoke"
-if ! bash /tmp/spark-vllm-recipes/tools/smoke.sh http://maxwell:8000/v1; then
+# smoke.sh takes the served name as $1 (not the endpoint): positional here = model name
+if ! ENDPOINT=http://maxwell:8000/v1 bash /tmp/spark-vllm-recipes/tools/smoke.sh; then
   echo "FAIL: smoke"; restore_stock; exit 1
 fi
 
