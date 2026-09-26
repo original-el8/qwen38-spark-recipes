@@ -11,6 +11,18 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925`. No forks, no wheel replacements.
 3. GDN coalesce gate (port adaptation): in `qwen_gdn_linear_attn.py:get_kv_cache_spec`, when `not self.prefill_checkpoint_blocks` AND `envs.VLLM_QWEN3_8_PREFILL_COALESCE`, return `replace(spec, num_prefill_checkpoint_blocks=1)` so GDN and PLE groups declare the uniform value the nightly `mamba_hybrid` validator requires.
 4. `docker build -f Dockerfile.r6` (bakes `verify6.py` gauntlet: aborts if `export_checkpoint`, HC knobs, or `autotune`-free state are missing).
 
+## Required serving environment (7) — all cells measured with exactly these
+```
+VLLM_MXFP8_LM_HEAD=1
+VLLM_LM_HEAD_A16=1
+VLLM_MTP_NVFP4_LM_HEAD=1
+VLLM_B12X_MOE_FP4_LAYER_MAX_INPUT_SCALE=w13
+VLLM_QWEN3_8_FLASH_NEXT_OVERLAP=1
+VLLM_QWEN3_8_FLASH_NEXT_MTP_COMPACT=1
+VLLM_GDN_SPEC_DECODE_METADATA_FASTPATH=1
+```
+Verified live via `docker exec <rank> env` on all four ranks (2026-09-26). A reproduction missing any of these is not measuring this recipe.
+
 ## Flags that matter (2026-09-26 evidence, all identity+content-gated, correctness-certified)
 | flag | verdict |
 |---|---|
