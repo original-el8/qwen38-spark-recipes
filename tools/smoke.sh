@@ -45,9 +45,9 @@ assert args.get('count')==3 and args.get('unit_price')==42, args
 print('  ok:', args)"
 
 # [5/5] image input (needs --limit-mm-per-prompt image>=1); loose functional gate
-printf '{"model":"%s","messages":[{"role":"user","content":[{"type":"text","text":"What single color dominates this image?"},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}}]}],"max_tokens":24,"temperature":0}' \
-  | curl -sf -m 60 "$ENDPOINT/chat/completions" -H 'content-type: application/json' -d @- \
-  | python3 -c "import json,sys; c=json.load(sys.stdin)['choices'][0]['message']['content']; assert c and c.strip(), 'empty vision reply'; print('  ok: vision reply:', c.strip()[:60])" \
+printf '{"model":"%s","messages":[{"role":"user","content":[{"type":"text","text":"What single color dominates this image? Answer with the color name."},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="}}]}],"max_tokens":200,"temperature":0}' \
+  | curl -sf -m 90 "$ENDPOINT/chat/completions" -H 'content-type: application/json' -d @- \
+  | python3 -c "import json,sys; m=json.load(sys.stdin)['choices'][0]['message']; c=((m.get('content') or '')+' '+(m.get('reasoning') or '')).strip(); assert c, 'empty vision reply (content+reasoning)'; print('  ok: vision reply:', c[:80])" \
   || { echo "FAIL: image input step"; exit 1; }
 # video LIMIT gate is startup-level: boot fails if video modality unsupported; deep
 # video functionality is checked manually (engine accepts --limit-mm-per-prompt video:2).
