@@ -5,6 +5,22 @@ Serves `Qwen3.8-Flash-Next` (and alias `qwen38-flash-next-nvfp4`) at
 FP8-E4M3 KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424
 tokens).
 
+## Default serving config (2026-09-26): [`overlay/`](overlay/) — Path B
+
+`overlay/` mirrors the live fleet deployment exactly (`qwen38-qsa-selection-20260917-*`,
+image `spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1`, ID `953b00ee`;
+built from [`../build/README.md`](../build/README.md)). Promoted as serving default after the
+matched A/B (`../COMPARISON.md`): cold prefill 4,894±10 (8K) / 4,712 (16K) / 4,556 (32K) /
+4,304 tok/s (64K), +34% over the stock base; HC prefill sharding on (`HC_PREFILL_MODE=shard`),
+coalesce + QSA fusion, KV 42 GiB/rank. Bring-up/stop order identical to below, using
+`--env-file <host>.env -p qwen38-qsa-selection-<date>`; promotion with gates:
+[`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh).
+
+The files in **this directory** remain the **stock fallback** (goal's base-image recipe,
+`eugr/spark-vllm-b12x` nightly, rebuilt from Docker Hub with no fleet-local bits; faster
+primed-context decode). One `compose down` + `compose up` per host switches between them;
+NEVER without port-release gating (see Pitfalls — the 2026-09-26 EADDRINUSE false-regression).
+
 ## Files
 
 | file | role |

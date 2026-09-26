@@ -5,8 +5,8 @@ NVIDIA DGX Spark cluster with a dual-NIC RoCE fabric. Two topologies ship here:
 
 | recipe | hosts | what it is |
 |---|---|---|
-| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool |
-| [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left |
+| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — **`tp4/overlay/` is the serving default (Path B)**, root files = stock fallback |
+| [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left — same `overlay/` default + stock fallback |
 
 Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
 (schema in [`data/README.md`](data/README.md)).
@@ -67,9 +67,10 @@ in-checkpoint `config.json` only by `"index_share_for_mtp_iteration": false`.
 
 ## Images
 
-Default base per this repo's goal: **`eugr/spark-vllm-b12x`** nightlies from Docker Hub
-(vLLM `dev/karmic-kraken` + b12x `master`). The campaign measurements were taken on
-overlay images built from pinned sources. Full provenance, digests, and the rebuild recipe:
+Serving default: the **campaign overlay** (built from pinned sources, reproducible via
+`build/`). Stock fallback base: **`eugr/spark-vllm-b12x`** nightlies from Docker Hub
+(vLLM `dev/karmic-kraken` + b12x `master`) — the original goal's mandated base, still
+published verbatim. Full provenance, digests, and the rebuild recipe:
 [`build/README.md`](build/README.md).
 
 ## Quick start (tp4)

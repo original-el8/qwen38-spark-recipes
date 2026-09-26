@@ -1,0 +1,118 @@
+{
+  "profile_id": "qwen38-qsa-selection-20260917",
+  "status": "candidate",
+  "image_tag": "spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1",
+  "image_id": "sha256:953b00ee516cac5f295bfb26863d3cfdcb5f950a6461bed76e11a84281468346",
+  "image_manifest": "/opt/spark-vllm/image-manifest.json",
+  "compose_project": "qwen38-qsa-selection-20260917",
+  "compose_file": "/home/jasonc/spark_vllm/deployments/qwen38-qsa-selection-20260917/compose.yml",
+  "model_path": "/home/jasonc/models/Qwen3.8-Flash-Next-NVFP4",
+  "checkpoint_export_manifest_sha256": "8a0b93599e3edb4ab25357e8af16cf1ac2c6a61354fcec9d6aa50ee9fbf94397",
+  "endpoint": "http://maxwell:8000/v1",
+  "served_model_name": "Qwen3.8-Flash-Next",
+  "tensor_parallel_size": 4,
+  "max_model_len": 262144,
+  "max_num_seqs": 16,
+  "max_num_batched_tokens": 8192,
+  "kv_cache_bytes_per_rank": 45097156608,
+  "mtp_tokens": 3,
+  "ple_enabled": true,
+  "hosts": {
+    "maxwell": {
+      "rank": 0,
+      "container": "qwen38-qsa-selection-20260917-0",
+      "environment_file": "/home/jasonc/spark_vllm/deployments/qwen38-qsa-selection-20260917/maxwell.env"
+    },
+    "ampere": {
+      "rank": 1,
+      "container": "qwen38-qsa-selection-20260917-1",
+      "environment_file": "/home/jasonc/spark_vllm/deployments/qwen38-qsa-selection-20260917/ampere.env"
+    },
+    "faraday": {
+      "rank": 2,
+      "container": "qwen38-qsa-selection-20260917-2",
+      "environment_file": "/home/jasonc/spark_vllm/deployments/qwen38-qsa-selection-20260917/faraday.env"
+    },
+    "hertz": {
+      "rank": 3,
+      "container": "qwen38-qsa-selection-20260917-3",
+      "environment_file": "/home/jasonc/spark_vllm/deployments/qwen38-qsa-selection-20260917/hertz.env"
+    }
+  },
+  "rollback_profile": "/home/jasonc/spark_vllm/deployments/qwen38-fp8-kv42-mtp3-20260917/profile.json",
+  "evidence": "/home/jasonc/spark_vllm/benchmark-results/qwen38-qsa-selection-20260917",
+  "cache_compatibility": "Fresh Torch/vLLM cache and a separate copy of content-addressed kernel caches. FP8 tuning namespaces may select different configurations from BF16.",
+  "qualification_scope": "QSA numerical equivalence, graph replay, matched serving performance and bounded concurrent retrieval.",
+  "sources": {
+    "vllm": {
+      "repository": "https://github.com/local-inference-lab/vllm.git",
+      "commit": "76061de4bff2adc741cb25018ca79991263228be",
+      "tree": "1f6d00d6db3f9a0df733a731c6197a3c3774f568",
+      "branch": "codex/qwen-moe-padding-20260917",
+      "version": "0.1.dev20846+g76061de4b",
+      "archive_sha256": "a37c84074dbf68b490f1b22b96ff181f5cbc7d90a8547340322233d8e7ebae34",
+      "worktree": "/home/jasonc/spark_vllm/worktrees/qwen38-moe-padding-20260917"
+    },
+    "b12x": {
+      "repository": "https://github.com/local-inference-lab/b12x.git",
+      "branch": "codex/qwen-qsa-selection-20260917",
+      "commit": "d2d5368d6c8a5cc43d79bfc8a4a5c58db584fc47",
+      "tree": "f1db9cabc8f362134bc90fdf63b9401e545c47ff",
+      "package_version": "1.3.0",
+      "archive_sha256": "99ae430493b984e61310ac291d7bb733aa6562b178e06d02a48122bd0ef4b891",
+      "worktree": "/home/jasonc/spark_vllm/worktrees/b12x-qwen-qsa-selection-20260917",
+      "upstream_commit": "5cc27234eaf4113dc41cb308753e152b1e71ce8e"
+    }
+  },
+  "comparison_scope": "Exact QSA stable-selection fusion and removal of overwritten index remapping; vLLM and all inference settings match the selected FP8 baseline.",
+  "automatic_rollback": false,
+  "failure_policy": "Retain candidate logs and stop failed ranks; leave the cluster available for investigation. User explicitly waived restoring the preceding service between attempts.",
+  "load_format": "instanttensor",
+  "loader_decision": "User set aside the B12X checkpoint-loader change; retain established InstantTensor loading.",
+  "hc_prefill_mode": "shard",
+  "baseline_profile": "/home/jasonc/spark_vllm/deployments/qwen38-fp8-kv42-mtp3-20260917/profile.json",
+  "cache_namespace": "/home/jasonc/.cache/qwen38-qsa-selection-20260917",
+  "prefill_coalesce": true,
+  "profiler_config": {
+    "profiler": "torch",
+    "torch_profiler_dir": "/root/.cache/vllm/scaling-traces",
+    "torch_profiler_with_stack": false,
+    "torch_profiler_record_shapes": true,
+    "torch_profiler_with_memory": false,
+    "torch_profiler_use_gzip": true,
+    "torch_profiler_dump_cuda_time_total": true,
+    "ignore_frontend": true,
+    "detailed_trace_annotation": true,
+    "max_iterations": 20
+  },
+  "qsa_query_pairs": true,
+  "cudagraph_capture_sizes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    8,
+    10,
+    12,
+    16,
+    20,
+    24,
+    32,
+    40,
+    48,
+    64,
+    80
+  ],
+  "qualification": {
+    "status": "research-only",
+    "baseline_promoted": false
+  },
+  "kv_cache_dtype": "fp8_e4m3",
+  "target_host_available_gib": 16,
+  "headroom_metric": "Linux MemAvailable, including reclaimable cache",
+  "role": "experiment",
+  "recurrent_checkpoint_policy": "aligned",
+  "prefix_cache_retention_interval": 0
+}

@@ -4,6 +4,16 @@ Serves the same checkpoint from **maxwell (rank 0) + ampere (rank 1)** at
 `http://maxwell:8000/v1`. Same context (262,144), same MTP3, FP8 KV at **16 GiB per rank →
 1,918,359 tokens** (effective block 2,848), with ≥22 GiB MemAvailable left on every host.
 
+## Default serving config (2026-09-26): [`overlay/`](overlay/) — Path B
+
+`overlay/` mirrors the campaign TP2 profile (`qwen38-qsa-selection-tp2-20260917-{0,1}`,
+maxwell rank0 + ampere rank1, image ID `953b00ee`, KV 16 GiB/rank, MTP3). Note the profile
+ships `VLLM_QWEN3_8_HC_PREFILL_MODE=off` at TP2 (token-row sharding targets ≥3 ranks) with
+coalescing on. Validation + rollback tooling: [`../tools/tp2-campaign-validate.sh`](../tools/tp2-campaign-validate.sh)
+(manifest + RoCEnante marker proof, smoke, matched bench, TP4-overlay restore).
+Measured cells: `tp2-overlay-*` rows in [`../data/results.jsonl`](../data/results.jsonl).
+Stock files in this directory remain the fallback, same switch semantics as TP4.
+
 ## Files
 
 `serve.sh`, `compose.yml`, `maxwell.env`, `ampere.env`, `config.json`, `profile.json` — same

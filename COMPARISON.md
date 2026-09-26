@@ -41,8 +41,10 @@ Rows: `data/results.jsonl` ids `tp4-stock-karmic-*` / `tp4-campaign-overlay-prob
 
 ## What the published recipe is, and why
 
-`tp4/` and `tp2/` publish **Path A** as the default: it is the goal's mandated base, rebuilds
-from a public hub tag with no fleet-local bits, and its worst-vs-B cell is a long-prefill
-−25.5% inverse of B's +34%. Path B's contract is published with equal completeness
-(`build/README.md` + the surviving profile on the fleet): agents that need the prefill delta
-can materialize it exactly; agents that need reproducibility use Path A as-is.
+As of 2026-09-26 **Path B is the published and serving default** (`tp4/overlay/`,
+`tp2/overlay/` — live files mirrored into the repo): operator decision after this A/B, since
+the overlay is fully reconstructable (`build/README.md`, build contexts + dist archives
+retained on maxwell) and the prefill gap dominates serving traffic. **Path A** (`tp4/`,
+`tp2/` root files) remains published unchanged as the stock fallback: rebuilds from a public
+hub tag with no fleet-local bits, wins primed-context decode, and is one gated
+`compose down`/`up` away.
