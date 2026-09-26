@@ -19,11 +19,16 @@ restore_stock() {
   echo "STOCK-RESTORED (API check below)"
 }
 
-echo "== stop stock TP4 (rank0 first, then workers)"
-ssh maxwell "cd $CDIR && docker compose -p $CP stop spark-0" >/dev/null
-for r in 1 2 3; do
-  h=$( [ $r = 1 ] && echo ampere || { [ $r = 2 ] && echo faraday || echo hertz; } )
-  ssh $h "cd $CDIR && docker compose -p $CP stop spark-$r" >/dev/null
+echo "== stop stock TP4 (full down; service names differ between deployments — down is name-safe)"
+for h in maxwell ampere faraday hertz; do
+  ssh $h "cd $CDIR && docker compose -p $CP down --timeout 30" >/dev/null || echo "warn: stock down $h"
+done
+
+echo "== wait port 8000 release on maxwell (vLLM teardown outlives `stop`; EADDRINUSE race otherwise)"
+for i in $(seq 1 40); do
+  ssh maxwell "ss -xln 2>/dev/null | grep -q ':8000 '" || { echo "port free"; break; }
+  sleep 3
+  [ "$i" = 40 ] && { echo "FAIL: port 8000 never released"; exit 1; }
 done
 
 echo "== start campaign overlay: workers (ampere,faraday,hertz) then coordinator (maxwell)"
