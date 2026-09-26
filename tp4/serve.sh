@@ -70,6 +70,9 @@ fi
 if [[ -n "${PROFILER_CONFIG:-}" ]]; then
   variant_args+=(--profiler-config "${PROFILER_CONFIG}")
 fi
+if [[ "${ASYNC_SCHED:-1}" != "0" ]]; then
+  variant_args+=(--async-scheduling)   # ASYNC_SCHED=0 => off (sparkring ships without;
+fi                                     # untested axis for hybrid-GDN step throughput)
 
 exec "${engine[@]}" \
   "${headless_args[@]}" \
@@ -100,7 +103,6 @@ exec "${engine[@]}" \
   --mm-processor-cache-gb 0 \
   --limit-mm-per-prompt '{"image":8,"video":2}' \
   --enable-prefix-caching \
-  --async-scheduling \
   --moe-backend "${MOE_BACKEND:-b12x}" \
   --linear-backend "${LINEAR_BACKEND:-b12x}" \
   --no-enable-flashinfer-autotune \
