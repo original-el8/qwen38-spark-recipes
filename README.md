@@ -27,12 +27,13 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925` (public Docker Hub) + recipe defau
 
 Same base + a sha256-pinned **public** b12x mainline wheel + engine-flag envs
 ([`tp4/overlay.decode-max.yml`](tp4/overlay.decode-max.yml)). Buildable by anyone; see the
-overlay header for the two-step recipe. **Status 2026-09-26: not recommended** — the stock
-default's fresh-container tuning state reached its decode tier for free.
+overlay header for the two-step recipe. **Status: ranking PENDING** — all its numbers are
+from pre-promotion tuning state; same-state re-measure scheduled (this stack's tuning-state
+shifts are proven ±17% on decode — the same evidentiary bar applies here).
 | cell | value | note |
 |---|---:|---|
-| decode C1 cold | 64.8 tok/s ctx0 (steps/s 37.0) | **no longer beats the default** in its tuning state: default now steps at 36.1 (was 31.0 when this profile was cut); delta ≈ +2.5% |
-| prefill | 3,3–3,4xx | ≈5% under the default's steady 3,55x — mainline b12x autotune drifts on this vLLM pairing |
+| decode C1 cold | 64.8 tok/s ctx0, steps/s 37.0 (pre-promotion state) | default steps at 36.1 in current state (31.0 when this overlay was cut); 37.0 NOT re-verified in current state — edge unknown until same-state rerun |
+| prefill | 3,3–3,4xx (pre-promotion state) | mainline b12x autotune drifted on this vLLM pairing; also unverified in current state |
 | status | smoke-passed (arithmetic, tool-calls, vision) | NOT behavior-qualified: mainline b12x lacks eugr's 17 fork-ahead GB10/Spark commits — experimental |
 
 ## Against the reference stack (Fujitsu sparkring, same model + hardware class)
@@ -120,10 +121,14 @@ with exit 137 during long prefill).
 - A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
   seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
   arm before recording it.
-- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,7xx for
-  byte-identical config+image (fresh vs campaign-era container/cache state), reproduced in
-  both directions across independent full repeats. Headline tables quote the LOW (steady,
-  two-repeat) cluster; treat high-cluster rows as upper bound pending attribution.
+- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,7xx,
+  same image ID, byte-equal cache inventories (verified). Leading hypothesis: the shipped
+  default promotes TWO levers (block32 × b12x-spec-backends) each validated **singly** in
+  campaign A/Bs — the combination was never measured as one arm; it interacts
+  super-additively on decode (31→36.1 steps/s, beyond either alone) while costing
+  prefill. Single-variable re-attribution arm (`MTP_BACKENDS_IN_SPEC=0`, block32 kept)
+  is queued; until it lands, headline tables quote the LOW (steady, two-repeat) cluster
+  and high-cluster rows are upper bound only.
 - Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
   `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
   both before crediting any change.

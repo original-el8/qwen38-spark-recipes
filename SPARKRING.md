@@ -56,9 +56,10 @@ in the same nightly REQUIRES mainline-new attributes:
 
 Consequence: **newer b12x is a trade, not a free win.** We ship stock nightly as default
 (prefill parity vs author; C1 cold wall +18…+20%) and publish
-`tp4/overlay.decode-max.yml` (b12x `e39b437b` + flag suite + block32) — superseded 2026-09-26
-(the default's fresh-container tuning state hit 36.1 steps/s vs the overlay's 37.0; overlay
-no longer justified). Rebuild recipe and wheel provenance are
+`tp4/overlay.decode-max.yml` (b12x `e39b437b` + flag suite + block32) — ranking PENDING:
+its 37.0 steps/s was measured pre-promotion tuning state vs the default's current-state
+36.1; tuning-state shifts of ±17% are proven on this stack, so same-state re-runs decide
+it. Rebuild recipe and wheel provenance are
 in that overlay's header. Author's claimed patched-NCCL (+5–6.8% prefill) and SparkCache
 (TTFT restore) remain their engine-bound stack — neither is needed for parity, which is
 already met or exceeded per the scoreboard.

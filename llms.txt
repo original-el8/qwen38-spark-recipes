@@ -9,8 +9,9 @@ Results (full tables + row IDs in `data/results.jsonl`):
   two full repeats; an intermittent high tuning cluster 4,4–4,7xx is unattributed — quote
   the steady cluster); C1 cold decode 63.3–64.3 tok/s (steps/s 36.1); C8 249.2;
   5.49M-token FP8-KV pool at TP4.
-- decode-max profile (`tp4/overlay.decode-max.yml`, public wheel rebuild): steps/s 37.0 —
-  the default now matches it (36.1) with zero overlay, so this profile is NOT recommended.
+- decode-max profile (`tp4/overlay.decode-max.yml`, public wheel rebuild): steps/s 37.0
+  measured pre-promotion state; default is 36.1 current-state — ranking PENDING a
+  same-state rerun (tuning-state shifts are proven on this stack).
 - vs the Fujitsu sparkring r37 reference (same model/hardware): prefill parity +0…5%,
   C1 cold decode +18…+20%, C8 big lead vs their cold wall / parity vs their warm wall;
   realistic-prompt decode parity on historical-image evidence (current cell in flight).
