@@ -34,10 +34,15 @@ for h in maxwell ampere faraday hertz; do
   curl -sf -m 2 "http://$h:8000/v1/models" >/dev/null 2>&1 && { echo "FAIL-PORT-HELD:$h"; exit 1; }
 done
 
-echo "== [$NAME] ship overlays to every rank (compose reads -f locally)"
+echo "== [$NAME] ship overlays to every rank + VERIFY (single-dest scp per host)"
 for f in "$@"; do
-  scp -3 -q "maxwell:$STG/$(basename "$f")" "ampere:$STG/" "faraday:$STG/" "hertz:$STG/" 2>/dev/null || true
+  b=$(basename "$f")
+  for h in ampere faraday hertz; do
+    scp -3 -q "maxwell:$STG/$b" "$h:$STG/" || { echo "FAIL-SHIP:$h/$b"; exit 1; }
+    ssh "$h" "test -f $STG/$b" || { echo "FAIL-SHIP-VERIFY:$h/$b"; exit 1; }
+  done
 done
+PCTX=${PCTX:-8k,16k,32k,64k,128k}; DCTX=${DCTX:-0,65536}; DUR=${DUR:-30}
 
 echo "== [$NAME] up $FL"
 for h in ampere faraday hertz; do
@@ -62,8 +67,8 @@ echo "== [$NAME] host state (thermal/clock attribution protocol)"
     ssh "$h" "nvidia-smi --query-gpu=temperature.gpu,power.draw,clocks.sm --format=csv,noheader | tr '\n' ' '; uptime -p" 2>/dev/null
   done; } | tee -a /tmp/ldb-hoststate.log
 
-echo "== [$NAME] LDB fast: C1 decode ctx0/64K + full prefill scale"
+echo "== [$NAME] LDB probe (PCTX=$PCTX DCTX=$DCTX DUR=${DUR}s) — fast-fail by default"
 cd "$LDB_DIR" && python3 llm_decode_bench.py --host maxwell --port 8000 \
-  --model Qwen3.8-Flash-Next --standalone-prefill \
-  --prefill-contexts 8k,16k,32k,64k,128k --concurrency 1 --contexts 0,65536
+  --model Qwen3.8-Flash-Next --standalone-prefill --duration "$DUR" \
+  --prefill-contexts "$PCTX" --concurrency 1 --contexts "$DCTX"
 echo "== [$NAME] done, arm left serving"
