@@ -121,16 +121,17 @@ with exit 137 during long prefill).
 - A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
   seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
   arm before recording it.
-- The LDB prefill instrument is **cluster-bimodal** on this stack: same config measured
-  4,391/4,704 (2026-09-26 midday) and 3,558–3,598 (2026-09-26 evening) — **byte-equal image,
-  caches (bg_15), and flags** (`tp4-ldb-block32-*` and `tp4-ldb-nospec-b32-*` are that same
-  config). No config variable explains the cluster; the honest residual is time-varying
-  machine/fleet state (thermal soak, clocks, background tenants) that we do not log.
-  Protocol added: `ldb-fast-matrix.sh` now records GPU temp/power/clocks + load per host so
-  the next cluster event is attributable. The engine-flag suite (author-shipped, campaign
-  best numbers ran with it ON) is a ship candidate on parity grounds only — if it measures
-  high, the claim will be "suite + unknown state", never "the suite caused it" without
-  flag-level controls.
+- **Serving-identity incident (2026-09-26, found + fixed):** the cycle script tore down only
+  its staging project and gated the port with a unix-socket check, so a promoted stack kept
+  answering `:8000` while arm containers crash-looped on bind — at least the `nospec-b32`
+  arm is definitively INVALID (row marked) and the midday lever-era rows are tagged
+  `unverified-port-identity` in [`results.jsonl`](data/results.jsonl). Tooling now removes
+  every compose container per rank, gates on the TCP API actually closing, and asserts the
+  answering container belongs to the arm before benching. Consequence stated plainly: the
+  "prefill cluster" mystery may be partly or wholly IDENTITY, not physics — the suite arm
+  and the b32/stock controls being re-run under the gate decide it, and until they land,
+  treat every prefill number on this page as provisional except the identity-clean
+  `tp4-ldb-promoted-*` (single-stack window) rows.
 - Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
   `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
   both before crediting any change.
