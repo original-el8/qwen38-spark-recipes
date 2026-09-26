@@ -16,7 +16,7 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925`. No forks, no wheel replacements.
 |---|---|
 | merge quality (three-way vs fuzz-patch) | THE lever: accept 1.84 -> 2.4-2.85 at temp-0; fuzz patches silently reverted nightly drift the merged tree keeps |
 | `DRAFT_SAMPLE=probabilistic` | no-op at temp-0 (90.0 vs 91.1); REQUIRED at temp-1 (82.4 vs 57.8, +42%) — fixes the greedy-draft-into-sampled-target acceptance collapse |
-| `VLLM_QWEN3_8_PREFILL_COALESCE` | UNTESTED: flag never reached containers (cycle ship-set bug, fixed 2026-09-26); all published cells ran COALESCE=0. GDN gate patch present but env-inert; validator-split heal under =1 unverified |
+| `VLLM_QWEN3_8_PREFILL_COALESCE` | set **0**. Tested =1 for real (2026-09-26, after ship-set fix): engine boots — GDN gate heals the mamba_hybrid validator — but decode regresses: 77.0 tok/s @ accept 2.15 vs 87–97 band @ 2.36–2.61 at =0. Prefill unchanged (3,369) |
 | `VLLM_QWEN3_8_HC_PREFILL_MODE` | DEAD: zero consumers in every image ever shipped, including campaign builds |
 
 ## Reference numbers (ctx0 C1 temp-0, warm caches)
