@@ -11,6 +11,17 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925`. No forks, no wheel replacements.
 3. GDN coalesce gate (port adaptation): in `qwen_gdn_linear_attn.py:get_kv_cache_spec`, when `not self.prefill_checkpoint_blocks` AND `envs.VLLM_QWEN3_8_PREFILL_COALESCE`, return `replace(spec, num_prefill_checkpoint_blocks=1)` so GDN and PLE groups declare the uniform value the nightly `mamba_hybrid` validator requires.
 4. `docker build -f Dockerfile.r6` (bakes `verify6.py` gauntlet: aborts if `export_checkpoint`, HC knobs, or `autotune`-free state are missing).
 
+## HC token-row-sharded prefill (the prefill fix, 2026-09-26)
+The reference author's +34% cold-prefill came from `VLLM_QWEN3_8_HC_PREFILL_MODE=shard`: prefill token rows are split across the 4 TP ranks (`owner_rows = rows/4`) and exchanged only at complete block boundaries (`all_gather`/`reduce_scatter`) instead of every layer replicating full TP partials.
+
+Our nightly tree had the module (`hc_prefill.py` was ported) but **no consumer**, so the flag was inert and prefill sat at 3.2-3.5k. The port is 11 call sites in `vllm/models/qwen4_exp/nvidia/model.py` (`tools/hc-consumer-port.py` applies it):
+- `hc_prefill.configure(self, vllm_config, envs.VLLM_QWEN3_8_HC_PREFILL_MODE)` in `Qwen4ExpModel.__init__`, plus the `_register_b12x_row_parallel_collective(..., "hc_block_output", ...)` hook when enabled.
+- `defer_hc_reductions` per decoder layer -> `reduce_results=not defer` on linear_attn / self_attn / mlp / MoE, with the deferred all-reduce re-issued as `hc_owner.reduce(...)`.
+- `hc_owner.gather/local/reduce` threading through the decoder forward (attn input, MLP input, deepstack, final mixer).
+- **The entry gate MUST live in `Qwen4ExpModel.forward`**, not only `Qwen4ExpForCausalLM.forward`: the serving path is `ForConditionalGeneration.forward -> self.language_model.model(...)`, which skips the ForCausalLM wrapper entirely. Gating in the wrong method = silent no-op (exactly the trap hit here: 0 `ELIGIBLE` calls until relocated).
+
+Result (TP4, 16k, cold, block32): **4,561 tok/s / 3.55 s TTFT** (from 3,174-3,477 / 4.65-5.12 s), decode unchanged at 91.4 tok/s.
+
 ## Required serving environment (7) — all cells measured with exactly these
 ```
 VLLM_MXFP8_LM_HEAD=1
