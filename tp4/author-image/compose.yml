@@ -1,19 +1,14 @@
-# Arm D — the author's EXACT engine image on our fabric (definitive comparison)
-# Image: ghcr.io/fujitsupolycom/sparkring@sha256:2375f876bc9ea065e85ae10cebad7a8db8a2ec0e6862b4441c269c5bf56365c6 (public)
-# Engine call + env ported VERBATIM from profiles/qwen38-flash-next-qad-tp4/compose/compose.rank0.yaml
-# (vendored reference: ../../data/author-r37-*.json|yaml), with ONLY these deviations:
-#   - fabric identity: MASTER_ADDR/VLLM_HOST_IP/NODE_RANK/MODEL_PATH from our <host>.env; socket
-#     iface enP2p1s0f0np0; NCCL_IB_HCA = our two HCA functions; their switchless-only pins dropped
-#     (NCCL_SWITCHLESS_RING_ONLY, B12X_ROCE_PEER_HCA_MAP, OPPOSITE_PATHS, 4-name HCA list) — our
-#     fabric is switched; b12x auto-policy discovers paths.
-#   - API port 8015 (stock stack must be DOWN — port gate), served-model-name unified.
-#   - cache root: $DEPLOY_DIR/.sparkring-cache (fresh per contract; first boot compiles ~15 min).
-# Their patched NCCL (LD_PRELOAD), SPARKRING_FEATURES, SparkCache flag, capture sizes, LM-head
-# trio (MXFP8=0), fuse_act_quant: ALL KEPT — that is the point of this arm.
-# Usage (workers r1..r3 first, r0 last; same env files as stock recipe):
-#   docker pull ghcr.io/fujitsupolycom/sparkring@sha256:2375f876bc9ea065e85ae10cebad7a8db8a2ec0e6862b4441c269c5bf56365c6   # every host
-#   docker compose --env-file <host>.env -p sr-author up -d
-# Readiness: GET :8015/health. Bench: llm_decode_bench --port 8015 + tools/warm-replay-probe.py.
+# EXAMINE-ONLY reference port of the author's engine invocation — NOT a deployment target.
+# Decision 2026-09-26: we reproduce on the public eugr nightly (arm C = flag parity). Their
+# image is not pulled: their collectives are tuned for a switchless RING (NCCL_ALGO=Ring,
+# SWITCHLESS_RING_ONLY, opposite-path HCA map) that does not port to our switched fabric —
+# ours is the faster transport for our topology. This file exists to diff their exact engine
+# call/env against ours; every line below is verbatim from
+# profiles/qwen38-flash-next-qad-tp4/compose/compose.rank0.yaml except the marked deviations.
+# Deviations from verbatim: our fabric identity (iface/HCA/master), switchless-only pins
+# dropped, API port 8015, fresh $DEPLOY_DIR/.sparkring-cache. Their patched NCCL,
+# SPARKRING_FEATURES, capture sizes, LM-head trio (MXFP8=0), fuse_act_quant: kept here ONLY
+# so the diff against our serve.sh is complete. DO NOT deploy; do NOT pull.
 services:
   model:
     image: ghcr.io/fujitsupolycom/sparkring@sha256:2375f876bc9ea065e85ae10cebad7a8db8a2ec0e6862b4441c269c5bf56365c6
