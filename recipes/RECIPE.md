@@ -29,7 +29,7 @@ Verified live via `docker exec <rank> env` on all four ranks (2026-09-26). A rep
 | merge quality (three-way vs fuzz-patch) | THE lever: accept 1.84 -> 2.4-2.85 at temp-0; fuzz patches silently reverted nightly drift the merged tree keeps |
 | `DRAFT_SAMPLE=probabilistic` | no-op at temp-0 (90.0 vs 91.1); REQUIRED at temp-1 (82.4 vs 57.8, +42%) — fixes the greedy-draft-into-sampled-target acceptance collapse |
 | `VLLM_QWEN3_8_PREFILL_COALESCE` | keep **0**. Tested =1 (certified: rank container env + StartedAt audit): boots — GDN gate heals the mamba_hybrid validator — but decode costs ~10% (81.7 tok/s @ accept 2.23 vs 90-97 @ 2.36-2.61); prefill unchanged. No benefit found |
-| `VLLM_QWEN3_8_HC_PREFILL_MODE` | DEAD: zero consumers in every image ever shipped, including campaign builds |
+| `VLLM_QWEN3_8_HC_PREFILL_MODE` | LIVE in the campaign lineage, DEAD in ours. The campaign image ships a PYTHONPATH-shadowing vendored vLLM at `/opt/spark-vllm/vllm` whose `models/qwen3_8_flash_next/model.py:481` calls `hc_prefill.configure(self, vllm_config, envs.VLLM_QWEN3_8_HC_PREFILL_MODE)` and threads `hc_prefill.RowOwnership` through 12 forward-path sites; campaign compose sets `shard`. The nightly lineage maps this family to upstream `qwen4_exp`, whose model file has NO hc_prefill consumer - so the flag is inert and the ported `hc_prefill.py` modules are dead weight there. Prefill evidence: campaign-lineage flags-off 16K = 4,378-4,536 tok/s vs nightly-lineage 3,174-3,475. Candidate root cause of the prefill gap; porting the consumer call sites into `qwen4_exp` is the fix |
 
 ## Reference numbers (ctx0 C1 temp-0, warm caches)
 non-spec 56.6 tok/s -> MTP 90-103 tok/s = 1.6-1.8x. Prefill 16k: 3.3-3.4k tok/s, TTFT ~4.8-5.1 s.
