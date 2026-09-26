@@ -28,7 +28,7 @@ Verified live via `docker exec <rank> env` on all four ranks (2026-09-26). A rep
 |---|---|
 | merge quality (three-way vs fuzz-patch) | THE lever: accept 1.84 -> 2.4-2.85 at temp-0; fuzz patches silently reverted nightly drift the merged tree keeps |
 | `DRAFT_SAMPLE=probabilistic` | no-op at temp-0 (90.0 vs 91.1); REQUIRED at temp-1 (82.4 vs 57.8, +42%) — fixes the greedy-draft-into-sampled-target acceptance collapse |
-| `VLLM_QWEN3_8_PREFILL_COALESCE` | keep **0**. =1 still untested after two false starts (ship-set shipped no files; then flag flipped on the coordinator copy while the ship source is the rank-0 dir). GDN gate patch present; validator heal under =1 unverified |
+| `VLLM_QWEN3_8_PREFILL_COALESCE` | keep **0**. Tested =1 (certified: rank container env + StartedAt audit): boots — GDN gate heals the mamba_hybrid validator — but decode costs ~10% (81.7 tok/s @ accept 2.23 vs 90-97 @ 2.36-2.61); prefill unchanged. No benefit found |
 | `VLLM_QWEN3_8_HC_PREFILL_MODE` | DEAD: zero consumers in every image ever shipped, including campaign builds |
 
 ## Reference numbers (ctx0 C1 temp-0, warm caches)
