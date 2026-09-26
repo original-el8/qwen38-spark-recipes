@@ -106,8 +106,13 @@ ID `953b00ee`) as `qwen38-qsa-selection-20260917-{0..3}`, API `maxwell:8000`. Pr
 matched A/B showed +34% cold prefill; confirmed live with image-manifest + RoCEnante markers
 and bench (cold prefill 4,894±10 @8K, 4,712 @16K, 4,556 @32K, 4,304 @64K; cold per-run).
 Both overlays additionally pin the operator engine-flag set (LM-head/MTP/overlap/fastpath —
-see `tp4/overlay.yml`); matched re-probe both topologies: prefill neutral, TP4 primed-C8
-+8.4%, remainder inside MTP-acceptance noise (`*-flags7-*` rows).
+see `tp4/overlay.yml`). Matched re-probe with VERIFIED arms on both topologies (fresh
+staging dirs + in-container env proofs): TP4 prefill neutral, primed-C8 +8.4%, decode C1
+acceptance-noisy; TP2 **neutral in every cell** (`*-flags7-*` + `tp2-overlay-preflags-verified-*`
+rows). The unified one-compose files are live-validated serving the TP2 overlay variant
+(2026-09-26) — that live test is also how a V2-runner pin crash was caught and the pin
+removed (`tp2/overlay.yml` comment); TP4-side unified files are `docker compose config`-
+validated with live confirmation at the next `tools/cutover-campaign.sh` cutover.
 Rollback to stock = same files WITHOUT `-f overlay.yml` (project `qwen38-karmic-tp4-20260925`
 deployment dirs still on-host as the legacy stock stack). Promotion tool: `tools/cutover-campaign.sh`
 (port-release gate + capture-wait + performance gate + auto-rollback). Cutover lesson recorded:

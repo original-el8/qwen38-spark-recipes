@@ -64,6 +64,11 @@ prefill) remains the on/off evidence.
 
 ## STATUS 2026-09-26: operator env set applied
 
+UPDATE same day (verified arms): at TP2 the flag set measured **neutral in all five probe
+cells** (see tp2/README); the TP4 readings above stand. Separately, the unified-compose
+live test proved this model REQUIRES the V2 model runner — a `VLLM_USE_V2_MODEL_RUNNER: "0"`
+pin crashes engine init at model load; never pin it off on this stack.
+
 The seven operator engine flags (`VLLM_MXFP8_LM_HEAD`, `VLLM_LM_HEAD_A16`,
 `VLLM_MTP_NVFP4_LM_HEAD`, `VLLM_B12X_MOE_FP4_LAYER_MAX_INPUT_SCALE=w13`,
 `FLASH_NEXT_OVERLAP=1`, `MTP_COMPACT=1`, `GDN_SPEC_DECODE_METADATA_FASTPATH=1`) are pinned in

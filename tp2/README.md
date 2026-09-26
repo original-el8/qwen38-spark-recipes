@@ -12,16 +12,23 @@ carries the campaign TP2 delta — same `953b00ee` image but `VLLM_QWEN3_8_HC_PR
 (token-row sharding targets ≥3 ranks), coalescing + LM-head/MTP flags on, KV 16 GiB/rank,
 MTP3. Provenance: [`profile.overlay.json`](profile.overlay.json). Validation + rollback
 tooling: [`../tools/tp2-campaign-validate.sh`](../tools/tp2-campaign-validate.sh) (manifest +
-RoCEnante marker proof, smoke, matched bench, TP4-overlay restore). Measured cells:
-`tp2-overlay-*` rows in [`../data/results.jsonl`](../data/results.jsonl) — live-fleet matched
-probe 2026-09-26, pre-flags vs the operator flag set (`overlay.yml`): cold 8K prefill
-3,368.6±60.6 → 3,340.0±63.1 (neutral; HC sharding is off at TP2 so only the LM-head/MTP
-flags act); decode cold C1 55.6→62.7, C8 155.4→153.1; primed-8K C1 48.1→54.6, C8
-122.8→112.9 — all inside acceptance-dominated noise at this topology.
+RoCEnante marker proof, smoke, matched bench, TP4-overlay restore). Flag effect, **verified
+arms only** — fresh staging dir, fresh cache namespaces, unified files, in-container env
+proof on both sides (`tp2-overlay-preflags-verified-*` vs `tp2-overlay-flags7-*`):
+prefill 8K 3,391±65 → 3,340±63; decode cold C1 54.3→62.7, C8 158.4→153.1; primed-8K
+C1 52.0→54.6, C8 **113.9±0.9 → 112.9±2.5 — neutral everywhere** (HC sharding is off at
+TP2, so only the LM-head/MTP flags act). Disclosed caveats: the earlier
+`tp2-overlay-baseline-*` rows ran from the live dir during a mid-campaign compose patch —
+their unflagged env is corroborated (container-reuse evidence + the verified prefill match)
+but the verified rows are authoritative; and this probe reads ~0.5× the campaign-methodology
+primed-C8 figures (114 here vs the 226.6 row above — TP4 shows the same 327.9→193.6 ≈0.59×
+ratio), a random-token-probe methodology gap identical on both topologies, not a regression.
 
 ## Files
 
-`serve.sh`, `compose.yml`, `maxwell.env`, `ampere.env`, `config.json`, `profile.json` — same
+`serve.sh`, `compose.yml`, `overlay.yml` (serving default) + `overlay.no-flags.yml`
+(measured pre-flag baseline), `maxwell.env`, `ampere.env`, `config.json`,
+`profile.overlay.json` — same
 contract as [`../tp4/`](../tp4/README.md) with exactly these differences:
 
 | item | tp4 | tp2 | why |
