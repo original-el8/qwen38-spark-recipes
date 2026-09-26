@@ -77,7 +77,7 @@ fi
 
 echo "== prefill verification (expect > 4,400 tok/s)"
 python3 /tmp/spark-vllm-recipes/tools/bench-quick.py http://maxwell:8000/v1 Qwen3.8-Flash-Next 3 \
-  | tee /tmp/campaign-cutover-verify.json | python3 -c 'import json,sys; d=json.load(sys.stdin); p=d["prefill-8192"]["mean"]; sys.exit(0 if p>4400 else 2)' \
-  || { echo "FAIL: prefill below 4,400"; restore_stock; exit 1; }
+  | tee /tmp/campaign-cutover-verify.json | python3 -c 'import json,sys; d=json.load(sys.stdin); p=d["prefill-8192"]["mean"]; print(f"gated prefill-8192: {p:.1f} tok/s (min 4400)"); sys.exit(0 if p>4400 else 2)' \
+  || { echo "FAIL: prefill gate (value printed above; verify markers + which container owns :8000 before retrying)"; restore_stock; exit 1; }
 
 echo "CAMPAIGN-CUTOVER-READY (Path B serving; stock stopped-but-intact in $CDIR)"
