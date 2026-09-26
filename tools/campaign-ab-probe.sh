@@ -34,8 +34,11 @@ echo "== wait readiness (campaign coordinator container)"
 C0=$(ssh maxwell "cd $CDIR && docker compose -p $CP ps --format '{{.Name}}' | head -1")
 echo "coordinator container: $C0"
 READY=0
+START_TS=$(date -u +%s)
 for i in $(seq 1 110); do
-  ssh maxwell "docker logs $C0 2>&1 | grep -q 'Application startup complete'" && { READY=1; break; }
+  # readiness = live API, not log text: reused containers carry stale startup lines
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://maxwell:8000/v1/models || echo 000)
+  [ "$code" = 200 ] && { READY=1; break; }
   ssh maxwell "docker inspect -f '{{.State.Running}}' $C0" 2>/dev/null | grep -q true || { echo "FAIL campaign rank0 exited"; ssh maxwell "docker logs --tail 40 $C0"; restore_stock; exit 1; }
   sleep 30
 done
