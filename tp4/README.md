@@ -61,7 +61,9 @@ warm-cache restart is minutes). Then run `tools/smoke.sh` and `tools/bench-quick
 | decode C1 @8K | 82.2 tok/s | `tp4-qsa-selection-decode-ctx8k-c1` |
 | decode C8 @8K | 327.9 tok/s aggregate | `tp4-qsa-selection-decode-ctx8k-c8` |
 
-Stock-base (karmic-nightly) cells are in `../COMPARISON.md`.
+Stock-base (karmic-nightly) probe cells and the A/B verdict against this table are in
+[`../COMPARISON.md`](../COMPARISON.md) (`tp4-stock-karmic-*` rows: 3,639 cold 8K prefill,
+primed-context decode stronger than the overlay).
 
 ## KV dtype decision (FP8 vs BF16 — deliberate, not default)
 

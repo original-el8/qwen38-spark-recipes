@@ -104,6 +104,13 @@ Why overlays existed: the campaign's vLLM branch (`76061de4`, HC token-ownership
 checkpoint export, MoE shard alignment — 10 local commits) post-dates everything public at the
 time and was never pushed; the fleet images must also not recompile kernels per host.
 
+## Rebuild inputs still on the build host
+
+The exact overlay inputs remain on maxwell: build contexts under
+`/home/jasonc/spark_vllm/build-contexts/<image-tag>/` (source tars, Dockerfile, manifest) and
+peer-distribution archives `~/.cache/<image-tag>-distribute.tar.zst`. Path B is therefore
+reconstructable byte-exactly without re-deriving the source branches.
+
 ## Open questions tracked by the fleet (not blockers)
 
 - The b12x beta line (`integration/karmic-kraken-beta`) leads `master` on PCIe/world-size-3

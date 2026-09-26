@@ -13,8 +13,12 @@ Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
 
 ## Results
 
-_Tables finalized after the 2026-09-25/26 re-validation on the stock-base image; see
-`COMPARISON.md`._
+Live re-validation on the stock base (image ID `sha256:64d4c3e0…`) 2026-09-25: TP4 serving,
+4/4 behavior smoke, all-rank health; matched probe cells in `data/results.jsonl`
+(`tp4-stock-karmic-*`). Full campaign matrices (BF16/FP8, tp4/tp2, HC/MoE/MTP/RoCE ablations)
+in [`data/results.jsonl`](data/results.jsonl) + [`data/campaign-matrix.json`](data/campaign-matrix.json).
+Stock-vs-overlay A/B verdict: [`COMPARISON.md`](COMPARISON.md) — overlay wins cold prefill
+(+34.2%) and cold decode (+15-16%); stock wins primed-context decode (+13.6/+25.7%).
 
 ## Hardware
 
