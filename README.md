@@ -105,6 +105,7 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 | [`build/`](build/README.md) | base-image provenance (Docker Hub), overlay lineage, rebuild recipe |
 | [`tools/`](tools/) | `smoke.sh` (behavior gates), `bench-quick.py` (matched probe), `cutover-tp4.sh` (fleet stop/start/rollback orchestration) |
 | [`data/`](data/README.md) | every quoted number as [`results.jsonl`](data/results.jsonl); per-variant ablation records in [`campaign-matrix.json`](data/campaign-matrix.json) |
+| `SPARKRING.md` | applicability of Fujitsu sparkring profile levers to this fleet (verified envs, test order, retained negatives) |
 | `COMPARISON.md` | stock karmic-nightly vs campaign overlay image, matched probe cells (`tools/bench-quick.py` run on both stacks) |
 | `tools/campaign-ab-probe.sh` | one-command A/B: campaign profile up → API-gate → probe → stock restore |
 | `llms.txt` | agent entry point |
