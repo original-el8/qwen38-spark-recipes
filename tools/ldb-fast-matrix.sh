@@ -57,9 +57,10 @@ for _ in $(seq 1 60); do
   sleep 20
 done
 [ "$READY" = 1 ] || { echo "FAIL-READY-$NAME"; exit 1; }
-# Serve-identity gate: the answering server must be OUR arm, not a ghost.
-echo "== [$NAME] serving container on :8000:"
-ssh maxwell 'docker ps --filter publish=8000 --format "{{.Names}} {{.Image}}"' | tee /dev/stderr | grep -q "$PROJ" || { echo "FAIL-IDENTITY:$NAME"; exit 1; }
+# Serve-identity gate: host networking blinds publish-filters — match the
+# project-prefixed coordinator container name instead.
+echo "== [$NAME] serving container identity:"
+ssh maxwell 'docker ps --format "{{.Names}}"' | tee /dev/stderr | grep -q "^${PROJ}-tp4-0$" || { echo "FAIL-IDENTITY:$NAME"; exit 1; }
 
 echo "== [$NAME] host state (thermal/clock attribution protocol)"
 { for h in maxwell ampere faraday hertz; do
