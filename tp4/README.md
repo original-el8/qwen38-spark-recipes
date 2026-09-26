@@ -90,10 +90,14 @@ steady-state arm above is representative; (b) FP8 KV carries the open LAVD quali
 
 ## Verification gates passed (fleet, 2026-09-17/18 campaign + this re-validation)
 
-33/33 bounded behavior cases (arithmetic, tool call via `qwen3_xml`, prefix reuse, 8- and
-16-concurrent JSON retrieval at ~8K/64K/128K, changed-instructions-on-cached-context, vision);
-26/26 long shared-prefix + history-edit checks at 64K C4 / 128K C8; zero preemptions; zero OOM;
-all ranks healthy with matching image ID after each matrix. Full text:
+Re-validation on the **stock base image 2026-09-25** (`tools/smoke.sh` +
+`tools/long-prefix-check.py`, cold per-run prefixes): 4/4 behavior gates; 64K@C4 and 128K@C8
+shared-prefix + edited-tail cells PASS; changed-instructions-on-cached-context PASS; zero
+preemptions (exact `_total` counters); prefix-cache hit ratio 0.82–0.99 on shared prefixes;
+all four ranks `running restarts=0 oom=false`; MemAvailable 17 GiB (floor ≥16).
+Campaign-era deep validation on the overlay stack: 33/33 bounded behavior cases (arithmetic,
+tool call, prefix reuse, 8-/16-concurrent JSON retrieval at ~8K/64K/128K, changed instructions
+on cached context, vision); 26/26 long shared-prefix/history-edit checks. Full text:
 `qsa-selection-evidence.md`, `promotion-evidence.md`.
 
 ## Pitfalls (each cost real time in the campaign)

@@ -129,6 +129,11 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
   **by explicit operator choice** after that disclosure: parity-to-faster long-context
   prefill and 2.71× KV capacity, at a ~4% single-stream decode cost and the unresolved loop.
   BF16-KV cells remain available in [`data/results.jsonl`](data/results.jsonl).
+- T0 replay is bit-reproducible on the quiesced engine only when a per-request `seed` is
+  sent (verified by manual triple-send); unseeded replays — especially under load — can
+  diverge or differ in output length (MTP speculative path + shared sampler RNG). No part of
+  the stack claims unseeded bitwise determinism; `tools/long-prefix-check.py` reports it
+  rather than gating on it.
 - A one-off TP4 startup slowdown (2× MoE-kernel latency on the coordinator only, same graph,
   same clocks) was seen once and cleared on restart without any change; cause unresolved.
   Recipe advice: re-run before trusting a slow first arm — the campaign did.
