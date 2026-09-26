@@ -36,6 +36,11 @@ done
 [ "$READY" = 1 ] || { echo "FAIL-READY-$NAME"; exit 1; }
 
 echo "== [$NAME] LDB fast: C1 decode ctx0/64K + full prefill scale"
+echo "== [$NAME] host state (thermal/clock attribution protocol)"
+{ for h in maxwell ampere faraday hertz; do
+    printf "%s: " "$h"
+    ssh "$h" "nvidia-smi --query-gpu=temperature.gpu,power.draw,clocks.sm --format=csv,noheader | tr '\n' ' '; uptime -p" 2>/dev/null
+  done; } >> /tmp/ldb-hoststate.log 2>&1
 cd "$LDB_DIR" && python3 llm_decode_bench.py --host maxwell --port 8000 \
   --model Qwen3.8-Flash-Next --standalone-prefill \
   --prefill-contexts 8k,16k,32k,64k,128k --concurrency 1 --contexts 0,65536

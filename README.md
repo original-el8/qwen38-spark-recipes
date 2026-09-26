@@ -121,14 +121,16 @@ with exit 137 during long prefill).
 - A one-off coordinator startup slowdown (2× MoE-kernel latency, same graph/clocks) was
   seen once and cleared on restart, cause unresolved: re-run any suspiciously slow first
   arm before recording it.
-- The LDB prefill instrument is **cluster-bimodal** on this stack: ~3,55x vs ~4,4–4,9k.
-  Tested and REJECTED: image ID (identical), cache contents (byte-equal, bg_15), spec-backend
-  × block32 interaction (`tp4-ldb-nospec-b32-*`: prefill unmoved). What remains true: every
-  4.5k+ number we or the author ever recorded ran with the author's ENGINE-FLAG SUITE ON
-  (`HC_PREFILL_MODE=shard`, `PREFILL_COALESCE`, `MTP_COMPACT`, `OVERLAP`, LM-head trio,
-  spec fastpath, `fuse_act_quant` + capture-size list) — our promoted default ships without
-  it (suite was retired on warm-regime isolated probes: wrong instrument, own goal).
-  Ship-candidate arm with the full suite restored is under measurement now.
+- The LDB prefill instrument is **cluster-bimodal** on this stack: same config measured
+  4,391/4,704 (2026-09-26 midday) and 3,558–3,598 (2026-09-26 evening) — **byte-equal image,
+  caches (bg_15), and flags** (`tp4-ldb-block32-*` and `tp4-ldb-nospec-b32-*` are that same
+  config). No config variable explains the cluster; the honest residual is time-varying
+  machine/fleet state (thermal soak, clocks, background tenants) that we do not log.
+  Protocol added: `ldb-fast-matrix.sh` now records GPU temp/power/clocks + load per host so
+  the next cluster event is attributable. The engine-flag suite (author-shipped, campaign
+  best numbers ran with it ON) is a ship candidate on parity grounds only — if it measures
+  high, the claim will be "suite + unknown state", never "the suite caused it" without
+  flag-level controls.
 - Method: decode rates depend on MTP acceptance — every decode row records `steps/s` and
   `mtp_acceptance_length` (tok/s ÷ accept = engine steps/s, acceptance-independent); read
   both before crediting any change.
