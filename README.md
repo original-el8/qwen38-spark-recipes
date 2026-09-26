@@ -19,7 +19,7 @@ Base: `eugr/spark-vllm-b12x:nightly-20260925` (public Docker Hub) + recipe defau
 | prefill 8K / 16K / 32K / 64K / 128K (tok/s, cold) | **3,558 / 3,575 / 3,435 / 3,233 / 2,841** steady state | llm_decode_bench fast matrix ×2 full repeats, near-identical: `tp4-ldb-promoted-prefill-*`. An intermittent HIGH tuning cluster (4,4–4,7xx; `tp4-ldb-block32-*`) does NOT reproduce on fresh-container state — attribution unresolved, see honesty box |
 | decode C1 cold (tok/s, ctx0 / 64K) | **63.3–64.3** | same runs, `tp4-ldb-promoted-decode-*-c1`; MTP-normalized steps/s 36.1, accept 1.75–1.83 |
 | decode C8 (tok/s, ctx0 / 64K) | **249.2 / 243.3** | `tp4-ldb-promoted-decode-*-c8`; campaign image's 336.2 was a higher-accept historical cell (`tp4-qsa-selection-decode-ctx0-c8`) |
-| decode C1 realistic prompts (tok/s) | current-config cell in flight (`--prompt-file` realistic dataset); historical: 75.9±24.9 stock, 87.5±10.7 campaign image | llm_decode_bench realistic-dataset probe |
+| decode C1 realistic prompts (tok/s, ctx0 / 64K) | 58.3 / 57.9 — LDB mixed-regime cell, NOT regime-comparable (see scoreboard) | `tp4-ldb-promoted-realistic-*`; the comparable cell comes from `tools/warm-replay-probe.py` on the final config |
 | KV capacity | **5,486,463 tokens** (42 GiB FP8 KV/rank ×4, effective block 1,424) | `tp4/compose.yml` budgets, verified at startup |
 | TP2 pair (maxwell-class hosts ×2) | same context; 1,918,359-token KV pool; ≥22 GiB MemAvailable kept | [`tp2/`](tp2/README.md) |
 
@@ -47,7 +47,7 @@ Like-for-like (full table + reasoning: [`SPARKRING.md`](SPARKRING.md)):
 |---|---:|---:|---|
 | prefill cold 16K | 3,394–3,813 | **3,575** (high-cluster 4,5–4,7xx intermittent, unattributed) | parity, +0…5% (high cluster: +19…+39%) |
 | C1 decode cold wall (ctx0) | 53.5 | **63.3–64.3** (steps/s 36.1) | **+18…+20%** (their fixture carries TTFT; weak-comparable) |
-| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window (prefix-cached replays) | **58.3 current config** (`tp4-ldb-promoted-realistic-decode-c1`) | NOT parity on current config (−29%); their cell is warm-replay-heavy — regime split pending the attribution arm |
+| C1 decode, realistic-fixture regime | 81.9 wall / 83.7–85.4 window (prefix-cached replays) | 58.3 LDB-dataset cell = **mixed regime (scout+cold+warm replays folded into one wall aggregate) — NOT comparable** to their window or our historical replay cells | method-matched warm-replay probe against the final config is the only cell that will answer this |
 | C8 decode | cold wall 96.8–99.0 / warm wall 255–259.5 | **249.2** (ctx0 cold) | big lead vs their cold wall; ≈parity vs warm wall (−3%) |
 
 Env-level levers A/B'd against the default (one variable per run, same instrument):

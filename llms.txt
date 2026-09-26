@@ -14,8 +14,7 @@ Results (full tables + row IDs in `data/results.jsonl`):
   same-state rerun (tuning-state shifts are proven on this stack).
 - vs the Fujitsu sparkring r37 reference (same model/hardware): prefill parity +0…5%,
   C1 cold decode +18…+20%, C8 big lead vs their cold wall / parity vs their warm wall;
-  realistic-prompt C1 58.3 current-config — BELOW author warm wall -29%, regime split in flight;
-  The famous "author gap" was a warm-window-vs-cold-wall metric artifact — see
+  realistic-fixture C1 = OPEN (LDB mixed-regime cell 58.3 not comparable; warm-replay probe decides);
   `SPARKRING.md` before repeating it.
 
 Read order:
