@@ -5,8 +5,8 @@ NVIDIA DGX Spark cluster with a dual-NIC RoCE fabric. Two topologies ship here:
 
 | recipe | hosts | what it is |
 |---|---|---|
-| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — **`tp4/overlay/` is the serving default (Path B)**, root files = stock fallback |
-| [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left — same `overlay/` default + stock fallback |
+| [`tp4/`](tp4/README.md) | maxwell + ampere + faraday + hertz | full fleet, 262,144-token context, FP8 KV, 5.49M-token KV pool — one `compose.yml`, `-f overlay.yml` switches stock base → campaign overlay (serving default) |
+| [`tp2/`](tp2/README.md) | maxwell + ampere | two-Spark pair, FP8 KV, 1.92M-token KV pool, ≥22 GiB host headroom left — same compose + overlay-override pattern |
 
 Every number below links to a row in [`data/results.jsonl`](data/results.jsonl)
 (schema in [`data/README.md`](data/README.md)).
@@ -73,29 +73,31 @@ Serving default: the **campaign overlay** (built from pinned sources, reproducib
 published verbatim. Full provenance, digests, and the rebuild recipe:
 [`build/README.md`](build/README.md).
 
-## Quick start (tp4)
+## Quick start (tp4, either image variant)
 
 ```bash
-# on each of maxwell ampere faraday hertz: pull and verify the SAME image id
+# 1) pick base or overlay, on every host — base is a pull, overlay is a build (build/README.md)
 docker pull eugr/spark-vllm-b12x:nightly-20260925
-docker image inspect -f '{{.Id}}' eugr/spark-vllm-b12x:nightly-20260925
 
-# stage tp4/ files to every host at /home/jasonc/spark_vllm/deployments/qwen38-karmic-tp4-<date>/
-# (serve.sh, compose.yml, config.json, <host>.env) and create the four cache dirs there
+# 2) stage tp4/{compose.yml,overlay.yml,serve.sh,config.json,<host>.env} into $DEPLOY_DIR
+#    on each host; create cache dirs $(dirname): compose binds $CACHE_ROOT-{vllm,triton,...}
 
-# start order: workers first (ampere, faraday, hertz), then coordinator (maxwell):
-ssh ampere   'cd /home/jasonc/spark_vllm/deployments/qwen38-karmic-tp4-<date> && docker compose --env-file ampere.env   -p qwen38-karmic-tp4-<date> up -d'
-ssh faraday  'cd … && docker compose --env-file faraday.env  -p qwen38-karmic-tp4-<date> up -d'
-ssh hertz    'cd … && docker compose --env-file hertz.env    -p qwen38-karmic-tp4-<date> up -d'
-ssh maxwell  'cd … && docker compose --env-file maxwell.env  -p qwen38-karmic-tp4-<date> up -d'
+# 3) workers first (ampere, faraday, hertz), then coordinator (maxwell) — drop `-f overlay.yml`
+#    for the stock base:
+ssh ampere  'cd $DEPLOY_DIR && docker compose --env-file ampere.env  -p myproj -f compose.yml -f overlay.yml up -d'
+ssh faraday 'cd $DEPLOY_DIR && docker compose --env-file faraday.env -p myproj -f compose.yml -f overlay.yml up -d'
+ssh hertz   'cd $DEPLOY_DIR && docker compose --env-file hertz.env   -p myproj -f compose.yml -f overlay.yml up -d'
+ssh maxwell 'cd $DEPLOY_DIR && docker compose --env-file maxwell.env -p myproj -f compose.yml -f overlay.yml up -d'
 
-# readiness: coordinator log reaches "Application startup complete" (cold compile can take ~10 min)
-ssh maxwell 'docker logs -f qwen38-karmic-tp4-<date>-0'
-./tools/smoke.sh http://maxwell:8000/v1
+# 4) readiness = live API (log grepping false-passes on reused containers):
+until curl -sf http://maxwell:8000/v1/models >/dev/null; do sleep 15; done   # cold compile ~10 min
+./tools/smoke.sh
 ```
 
 Stop order is the reverse (coordinator first). Startup/stop order is not optional: rank-0
 serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29507`.
+Switching image variants: `down` on all hosts, wait for :8000 release, `up` — see
+`tools/cutover-campaign.sh` for the gated version.
 
 ## Fleet state (2026-09-26)
 
@@ -103,8 +105,8 @@ serves the API and holds the rendezvous; workers headlessly join `MASTER_ADDR:29
 ID `953b00ee`) as `qwen38-qsa-selection-20260917-{0..3}`, API `maxwell:8000`. Promoted after
 matched A/B showed +34% cold prefill; confirmed live with image-manifest + RoCEnante markers
 and bench (cold prefill 4,894±10 @8K, 4,712 @16K, 4,556 @32K, 4,304 @64K; cold per-run).
-Rollback = `docker compose --env-file <host>.env -p qwen38-karmic-tp4-20260925 up -d` per host
-(stock stopped intact; its compose/env unchanged in `tp4/`). Promotion tool: `tools/cutover-campaign.sh`
+Rollback to stock = same files WITHOUT `-f overlay.yml` (project `qwen38-karmic-tp4-20260925`
+deployment dirs still on-host as the legacy stock stack). Promotion tool: `tools/cutover-campaign.sh`
 (port-release gate + capture-wait + performance gate + auto-rollback). Cutover lesson recorded:
 `compose stop <service>` with a guessed service name silently no-ops — the 2026-09-26 false
 "overlay regression" was stock still bound to :8000 (EADDRINUSE on the overlay coordinator);

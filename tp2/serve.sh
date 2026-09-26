@@ -1,21 +1,30 @@
 #!/usr/bin/env bash
-# Qwen3.8-Flash-Next on stock eugr/spark-vllm-b12x nightly (vllm dev/karmic-kraken + b12x master).
-# Rank-parallel entrypoint: NODE_RANK selects coordinator vs --headless worker.
+# Qwen3.8-Flash-NEXT rank entrypoint — ONE script for both image variants.
+#   stock base (eugr/spark-vllm-b12x nightly)  : defaults here, no extra env needed
+#   overlay (built via ../build/README.md)     : activated purely by env (see overlay.yml)
+# Behavior activated by environment (leave unset for stock base):
+#   ATTENTION_BACKEND            e.g. B12X (overlay build only; stock image lacks the backend)
+#   RECURRENT_CHECKPOINT_POLICY  e.g. aligned (overlay build only; stock CLI lacks the flag)
+#   PROFILER_CONFIG              torch-profiler JSON (optional, either image)
+#   HC_TP / VLLM_QWEN3_8_* envs   consumed inside the engine; this script only forwards env
 set -euo pipefail
-
 case "${NODE_RANK:?set NODE_RANK to 0, 1, 2, or 3}" in
   0|1|2|3) ;;
   *) printf 'NODE_RANK must be 0, 1, 2, or 3; got %s\n' "${NODE_RANK}" >&2; exit 2 ;;
 esac
-
-# Defensive: never inherit platform defaults baked by ancestor images.
 unset VLLM_GLM53_SPLIT_TARGET_BLOCK_SIZE VLLM_GLM53_SPLIT_MAMBA_BLOCK_SIZE
 unset GLM53_KDA_PREFILL_BACKEND PREFILL_SCHEDULE_INTERVAL
-
 export CUDA_VISIBLE_DEVICES=0
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export NCCL_IB_DISABLE=0
 export NCCL_DEBUG=${NCCL_DEBUG:-WARN}
+
+# engine entry: overlay images ship the venv at /opt/spark-vllm; stock images expose `vllm`
+if [ -x /opt/spark-vllm/.venv/bin/python ]; then
+  engine=(/opt/spark-vllm/.venv/bin/python -m vllm.entrypoints.cli.main serve /model)
+else
+  engine=(vllm serve /model)
+fi
 
 headless_args=()
 if [[ "${NODE_RANK}" != 0 ]]; then
@@ -41,7 +50,18 @@ if [[ "${MTP_TOKENS:-3}" != 0 ]]; then
   )
 fi
 
-exec vllm serve /model \
+variant_args=()
+if [[ -n "${ATTENTION_BACKEND:-}" ]]; then
+  variant_args+=(--attention-backend "${ATTENTION_BACKEND}")
+fi
+if [[ -n "${RECURRENT_CHECKPOINT_POLICY:-}" ]]; then
+  variant_args+=(--recurrent-checkpoint-policy "${RECURRENT_CHECKPOINT_POLICY}")
+fi
+if [[ -n "${PROFILER_CONFIG:-}" ]]; then
+  variant_args+=(--profiler-config "${PROFILER_CONFIG}")
+fi
+
+exec "${engine[@]}" \
   "${headless_args[@]}" \
   "${execution_args[@]}" \
   "${speculative_args[@]}" \
@@ -66,17 +86,18 @@ exec vllm serve /model \
   --dtype bfloat16 \
   --quantization modelopt_mixed \
   --gdn-decode-kernel b12x \
-  --linear-backend b12x \
-  --moe-backend b12x \
-  --no-enable-flashinfer-autotune \
   --mm-encoder-tp-mode data \
   --mm-processor-cache-gb 0 \
   --limit-mm-per-prompt '{"image":1}' \
   --enable-prefix-caching \
-  --enable-chunked-prefill \
   --async-scheduling \
+  --moe-backend "${MOE_BACKEND:-b12x}" \
+  --linear-backend "${LINEAR_BACKEND:-b12x}" \
+  --no-enable-flashinfer-autotune \
+  --enable-chunked-prefill \
   --generation-config vllm \
   --enable-auto-tool-choice \
   --tool-call-parser qwen3_xml \
   --reasoning-parser qwen3 \
+  "${variant_args[@]}" \
   --trust-remote-code

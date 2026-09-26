@@ -5,21 +5,30 @@ Serves `Qwen3.8-Flash-Next` (and alias `qwen38-flash-next-nvfp4`) at
 FP8-E4M3 KV pool of **42 GiB per rank → 5,486,463 tokens** (effective hybrid block 1,424
 tokens).
 
-## Default serving config (2026-09-26): [`overlay/`](overlay/) — Path B
+## Two variants, one compose
 
-`overlay/` mirrors the live fleet deployment exactly (`qwen38-qsa-selection-20260917-*`,
-image `spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1`, ID `953b00ee`;
-built from [`../build/README.md`](../build/README.md)). Promoted as serving default after the
-matched A/B (`../COMPARISON.md`): cold prefill 4,894±10 (8K) / 4,712 (16K) / 4,556 (32K) /
-4,304 tok/s (64K), +34% over the stock base; HC prefill sharding on (`HC_PREFILL_MODE=shard`),
-coalesce + QSA fusion, KV 42 GiB/rank. Bring-up/stop order identical to below, using
-`--env-file <host>.env -p qwen38-qsa-selection-<date>`; promotion with gates:
-[`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh).
+`compose.yml` serves BOTH image variants; `overlay.yml` is the complete overlay delta
+(image + engine envs, nothing else — read it, it's ~20 lines):
 
-The files in **this directory** remain the **stock fallback** (goal's base-image recipe,
-`eugr/spark-vllm-b12x` nightly, rebuilt from Docker Hub with no fleet-local bits; faster
-primed-context decode). One `compose down` + `compose up` per host switches between them;
-NEVER without port-release gating (see Pitfalls — the 2026-09-26 EADDRINUSE false-regression).
+```bash
+# workers first (ampere, faraday, hertz), coordinator (maxwell) last — on each host:
+cd $DEPLOY_DIR   # staged copy of these files + config.json + serve.sh
+docker compose --env-file <host>.env -p <project>          [-f overlay.yml] up -d
+docker compose --env-file <host>.env -p <project> [-a?]   # stop = down, name-safe
+```
+
+- **Without `-f overlay.yml`** → stock base `eugr/spark-vllm-b12x:nightly-20260925`
+  (the goal's base-image recipe; rebuilds from Docker Hub; faster primed-context decode).
+- **With `-f overlay.yml`** → campaign overlay `953b00ee` (build via
+  [`../build/README.md`](../build/README.md)); the **serving default on this fleet since
+  2026-09-26** after the matched A/B ([`../COMPARISON.md`](../COMPARISON.md)): cold prefill
+  4,894±10 (8K) / 4,712 (16K) / 4,556 (32K) / 4,304 tok/s (64K) = +34%.
+  Its machine-readable provenance: [`profile.overlay.json`](profile.overlay.json).
+- `serve.sh` is one env-gated script for both (`ATTENTION_BACKEND`,
+  `RECURRENT_CHECKPOINT_POLICY`, `PROFILER_CONFIG` unset ⇒ stock behavior).
+- Switching variants on a live fleet: full `down` + port-release wait + `up` — NEVER a
+  targeted `stop <service>` (name-safe lesson, 2026-09-26 EADDRINUSE false-regression;
+  gated promotion tool: [`../tools/cutover-campaign.sh`](../tools/cutover-campaign.sh)).
 
 ## Files
 

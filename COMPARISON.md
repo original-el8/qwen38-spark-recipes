@@ -41,8 +41,8 @@ Rows: `data/results.jsonl` ids `tp4-stock-karmic-*` / `tp4-campaign-overlay-prob
 
 ## What the published recipe is, and why
 
-As of 2026-09-26 **Path B is the published and serving default** (`tp4/overlay/`,
-`tp2/overlay/` — live files mirrored into the repo): operator decision after this A/B, since
+As of 2026-09-26 **Path B is the published and serving default** (`tp4/overlay.yml`,
+`tp2/overlay.yml` — the complete overlay delta as a compose override of the base recipe): operator decision after this A/B, since
 the overlay is fully reconstructable (`build/README.md`, build contexts + dist archives
 retained on maxwell) and the prefill gap dominates serving traffic. **Path A** (`tp4/`,
 `tp2/` root files) remains published unchanged as the stock fallback: rebuilds from a public
