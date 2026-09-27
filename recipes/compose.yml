@@ -1,6 +1,6 @@
 services:
   qwen38-flash-next:
-    image: ${QWEN38_IMAGE:-spark-vllm:qwen38-qsa-selection-76061de4-b12xd2d5368d-sm121-image-r1}
+    image: ${QWEN38_IMAGE:-spark-vllm:qwen38-r6prod-hcgate-r1}
     container_name: qwen38-qsa-selection-20260917-${NODE_RANK:-0}
     gpus: all
     network_mode: host
