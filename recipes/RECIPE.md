@@ -22,6 +22,12 @@ Our nightly tree had the module (`hc_prefill.py` was ported) but **no consumer**
 
 Result (TP4, 16k, cold, block32): **4,561 tok/s / 3.55 s TTFT** (from 3,174-3,477 / 4.65-5.12 s), decode unchanged at 91.4 tok/s.
 
+**Engagement criterion (the trap that costs hours):** sharding only engages when a *single* model forward sees >=1024 rows divisible by 4 — `eligible()` requires `rows >= 1024 and rows % 4 == 0` plus a pure-prefill metadata match. With `--max-num-batched-tokens 8192` a large prompt is **chunked**, so each chunk is its own forward; and any prompt partially served from prefix cache shifts the row count. Verify engagement from evidence, not from the flag: the module's own `QWEN_HC_PREFILL mode=shard rows=N owner_rows=N/4 rs=.. ag=..` log fires only the first 8 times, so for a reliable check compare `eligible()` decisions before/after a request (an instrumented build is in `tools/`).
+
+**Certified prefill table (TP4, C1, cold profile):** 8k 4,281 / 1.91s · 16k 4,532 / 3.57s · 32k 4,336 / 7.42s · 64k 4,069 / 15.76s · 128k 3,456 / 37.05s — versus the reference author's 8k 3,576 / 2.29s, 16k 3,604 / 4.49s, 32k 3,487 / 9.22s.
+
+**Correctness on the sharded path:** a unique 10,084-token prompt (prefix-cache-proof) produced `ELIGIBLE rows=7200 PASS`; the temp-0 argmax-exactness oracle on that same request returned 128/128, 0 violations.
+
 ## Required serving environment (7) — all cells measured with exactly these
 ```
 VLLM_MXFP8_LM_HEAD=1
