@@ -19,12 +19,14 @@ than quietly removed — see "Provenance" at the end.
 | prefill 32k | client tok/s / TTFT | **4,336 / 7.42 s** | 3,487 / 9.22 s |
 | prefill 64k | client tok/s / TTFT | 4,069 / 15.76 s | — |
 | prefill 128k | client tok/s / TTFT | 3,456 / 37.05 s | — |
-| decode ctx0 C1 temp-0 | tok/s (steps/s × accept) | **88–103** (37.0 × 2.4–2.85) | 64–65 at temp-0¹ |
+| decode ctx0 C1 temp-0 | tok/s (steps/s × accept) | **88–103** (37.0 × 2.4–2.85) | — (temp-1 only) |
 | decode ctx0 C1, no speculation | tok/s | 56.6 | — |
 
-¹ Reference reported high-80s at temp-1 with a probabilistic drafter; we reproduce that band
-exactly (82.4 tok/s, 36.7 steps × 2.25 accept — see the temp-1 note below). Our own pre-merge
-build on this hardware did 64.5 at temp-0, which is the fair temp-0 comparison.
+The reference figure for decode is a **temp-1** claim (high 80s at ~38 steps/s with a
+probabilistic drafter); we reproduce that band exactly — 82.4 tok/s at 36.7 × 2.25 — when
+serving as he does (see the temp-1 note below). No reference temp-0 number exists, so that
+column is left empty. For context on our own progression at temp-0: 64.5 on the pre-merge
+build → 90–103 once the port and merge landed.
 
 MTP speculative decoding is worth **1.6–1.8×** over the non-speculative reference on the same
 build. All decode figures are temperature-0 (the benchmark regime; temperature-1 behavior is

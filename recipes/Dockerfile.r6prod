@@ -1,0 +1,5 @@
+FROM eugr/spark-vllm-b12x:nightly-20260925
+COPY tree2/vllm /usr/local/lib/python3.12/dist-packages/vllm
+COPY ple5/__init__.py ple5/_kernels.py ple5/_preparation.py ple5/api.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple/
+COPY verify6.py verify7.py /tmp/
+RUN find /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name "__pycache__" -exec rm -rf {} + ; rm -rf /usr/local/lib/python3.12/dist-packages/vllm/__pycache__ ; python3 /tmp/verify6.py && python3 /tmp/verify7.py

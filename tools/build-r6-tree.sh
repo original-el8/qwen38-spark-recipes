@@ -51,6 +51,16 @@ assert old in s and s.count(old)==1
 open(p,"w").write(s.replace(old,new))
 PY
 grep -rl '<<<<<<<' tree2/vllm --include='*.py' && { echo "UNRESOLVED-CONFLICTS"; exit 1; }
+
+# HC token-row-sharded prefill consumer (the +31% prefill lever). Upstream renamed this
+# family to qwen4_exp and orphaned the consumer; the module is ported but nothing calls it.
+# The patch adds the 11 call sites AND relocates the entry gate into Qwen4ExpModel.forward
+# (gating in ForCausalLM.forward is a silent no-op: the serving path is
+# ForConditionalGeneration.forward -> language_model.model(...)).
+PATCH=${PATCH:-recipes/patches/hc-consumer.patch}
+[ -f "$PATCH" ] || PATCH=../recipes/patches/hc-consumer.patch
+( cd tree2 && patch -p1 --forward < "$PATCH" ) || { echo "HC-PATCH-FAILED"; exit 1; }
+echo "HC-CONSUMER-PATCHED"
 find tree2/vllm -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null
 # Verify every mutated file parses; then build: docker build -f recipes/Dockerfile.r6 (ple5 + tree2 in build ctx)
 python3 - <<'PY'
