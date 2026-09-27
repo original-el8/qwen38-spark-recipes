@@ -129,6 +129,12 @@ explicit `--temperature 0`. **cold** = first run after engine load, **warm** = s
 The cold penalty on this fork is ~10–20% of decode; rows are labelled and never averaged
 across regimes. `recipes/RECIPE.md` has the full detail.
 
+**Never measure while anything else may touch the fleet.** Six uncontaminated 16k prefill
+readings span 4,296–4,561 (±3%). Two readings taken during a concurrent container recreate
+landed at 3,414 and 2,600 — a 2× spread that looks exactly like the "intermittent 3.3k"
+drift this stack was previously mis-attributed to. A TP4 engine being driven while another
+script restarts ranks mid-flight produces numbers that are not just noisy but meaningless.
+
 ---
 
 ## Limits
