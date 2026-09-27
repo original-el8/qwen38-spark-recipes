@@ -22,8 +22,8 @@ R0=${RANK0:-maxwell}
 RANKS=(maxwell ampere faraday hertz)
 
 # Files that make up the build context. Keep this in sync with the Dockerfile's COPY lines.
-CTX=(tree2 ple5)
-for f in "$DF" verify6.py verify7.py verify8.py hc_probe_patch.py; do
+CTX=(tree2 ple5 qsa387)
+for f in "$DF" verify6.py verify7.py verify8.py verify9.py hc_probe_patch.py; do
   ssh "$R0" "test -f $SRC/$f" 2>/dev/null && CTX+=("$f")
 done
 
@@ -64,7 +64,7 @@ echo "== content identity =="
 PER_RANK=()
 FAILED=""
 for h in "${RANKS[@]}"; do
- got=$(ssh "$h" "docker run --rm --entrypoint bash $TAG -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>&1 | cut -c1-16 | tail -1)
+ got=$(ssh "$h" "docker run --rm --entrypoint bash $TAG -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple /usr/local/lib/python3.12/dist-packages/b12x/attention/qsa -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>&1 | cut -c1-16 | tail -1)
  case "$got" in
    [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) PER_RANK+=("$h:$got") ;;
    *) FAILED="$FAILED $h"; PER_RANK+=("$h:NOHASH") ;;

@@ -71,7 +71,7 @@ echo "== [$NAME] serving coordinator image: $GOT (expect $EXPECT)"
 # Hash every shipped .py tree inside each rank's pinned tag; TP4 ranks must serve
 # byte-identical code or every downstream number is suspect.
 H=$(for h in maxwell ampere faraday hertz; do
-      ssh "$h" "docker run --rm --entrypoint bash '$IMG' -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>/dev/null | cut -c1-16
+      ssh "$h" "docker run --rm --entrypoint bash '$IMG' -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple /usr/local/lib/python3.12/dist-packages/b12x/attention/qsa -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>/dev/null | cut -c1-16
     done | sort -u)
 echo "== [$NAME] rank code-tree hashes: $(echo "$H" | tr '\n' ' ')"
 [ "$(echo "$H" | wc -l)" = 1 ] || { echo "FAIL-CONTENT-DIVERGENCE:$NAME"; exit 1; }
