@@ -23,7 +23,7 @@ RANKS=(maxwell ampere faraday hertz)
 
 # Files that make up the build context. Keep this in sync with the Dockerfile's COPY lines.
 CTX=(tree2 ple5)
-for f in "$DF" verify6.py verify7.py hc_probe_patch.py; do
+for f in "$DF" verify6.py verify7.py verify8.py hc_probe_patch.py; do
   ssh "$R0" "test -f $SRC/$f" 2>/dev/null && CTX+=("$f")
 done
 
@@ -52,14 +52,28 @@ for h in ampere faraday hertz; do
 done
 wait
 
-# Content identity: image IDs differ per host (build timestamps live in the config hash), so
-# ID equality proves nothing. Hash the shipped python trees instead and require equality.
 echo "== content identity =="
-mapfile -t HASHES < <(for h in "${RANKS[@]}"; do
-  ssh "$h" "docker run --rm --entrypoint bash $TAG -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>/dev/null | cut -c1-16
-done | sort -u)
-printf '   %s\n' "${HASHES[@]}"
+# Content identity: image IDs differ per host (build timestamps live in the config hash),
+# so ID equality proves nothing. Hash the shipped python trees instead.
+#
+# NOTE: this gate previously compared only the *distinct* count of hashes and swallowed
+# stderr, so a rank whose `docker run` failed (missing/stale tag) contributed EMPTY output,
+# sort -u dropped it, and the remaining stale-tag worker still produced "1 unique hash ->
+# OK identical" alongside a build error. Each rank must now produce a non-empty hash.
+echo "== content identity =="
+PER_RANK=()
+FAILED=""
+for h in "${RANKS[@]}"; do
+ got=$(ssh "$h" "docker run --rm --entrypoint bash $TAG -c 'find /usr/local/lib/python3.12/dist-packages/vllm/models /usr/local/lib/python3.12/dist-packages/vllm/model_executor /usr/local/lib/python3.12/dist-packages/vllm/v1 /usr/local/lib/python3.12/dist-packages/vllm/envs.py /usr/local/lib/python3.12/dist-packages/b12x/sequence/ple -name \"*.py\" -exec sha256sum {} + | sort | sha256sum'" 2>&1 | cut -c1-16 | tail -1)
+ case "$got" in
+   [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) PER_RANK+=("$h:$got") ;;
+   *) FAILED="$FAILED $h"; PER_RANK+=("$h:NOHASH") ;;
+ esac
+done
+printf '   %s\n' "${PER_RANK[@]}"
+[ -n "$FAILED" ] && { echo "FAIL-NO-IMAGE-ON:$FAILED (tag missing or image failed to run; a stale tag may exist elsewhere)"; exit 1; }
+HASHES=($(printf '%s\n' "${PER_RANK[@]}" | cut -d: -f2 | sort -u))
 if [ "${#HASHES[@]}" != 1 ]; then
-  echo "FAIL-CONTENT-DIVERGENCE: ranks carry different code; do not serve this tag"; exit 1
+ echo "FAIL-CONTENT-DIVERGENCE: ranks carry different code; do not serve this tag"; exit 1
 fi
 echo "OK $TAG identical on ${#RANKS[@]} ranks (tree ${HASHES[0]})"
